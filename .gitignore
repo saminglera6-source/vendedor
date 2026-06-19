@@ -1,0 +1,5 @@
+node_modules/
+.env
+tsc_output.txt
+*.js.map
+dist/

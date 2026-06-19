@@ -1,0 +1,1095 @@
+{
+  "0": {
+    "block_uuid": "00000000-0000-4000-8000-000000000000",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "¡Hola! Bienvenido/a a GreatPhones 📱\n\nSomos especialistas en iPhone usados. ¿En qué te podemos ayudar hoy?",
+          "type": "external",
+          "buttons": [
+            {"type": "inline", "text": "Comprar iPhone"},
+            {"type": "inline", "text": "Plan Canje"},
+            {"type": "inline", "text": "Reparación"},
+            {"type": "inline", "text": "Garantía"},
+            {"type": "inline", "text": "Accesorios"},
+            {"type": "inline", "text": "Otra consulta"}
+          ],
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": true,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      }
+    ],
+    "answer": [
+      {
+        "handler": "buttons",
+        "params": [
+          {
+            "value": "_hot",
+            "synonyms": ["lo quiero", "voy hoy", "puedo pasar", "tienen stock", "me lo reservan", "aceptan transferencia", "paso esta tarde", "puedo verlo", "donde estan", "donde están", "paso hoy", "voy a pasar"],
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 90}}]
+          },
+          {
+            "value": "Comprar iPhone",
+            "synonyms": ["comprar", "compra", "precio", "cuanto sale", "cuánto sale", "cuanto cuesta", "iphone"],
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 1}}]
+          },
+          {
+            "value": "Plan Canje",
+            "synonyms": ["canje", "permuta", "entregar", "cuanto me", "cuánto me", "cambio mi"],
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 20}}]
+          },
+          {
+            "value": "Reparación",
+            "synonyms": ["reparacion", "reparación", "arreglar", "roto", "pantalla", "bateria", "batería", "no enciende", "no carga"],
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 50}}]
+          },
+          {
+            "value": "Garantía",
+            "synonyms": ["garantia", "garantía", "fallo", "falla", "problema con"],
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 60}}]
+          },
+          {
+            "value": "Accesorios",
+            "synonyms": ["accesorio", "accesorios", "funda", "cable", "cargador", "auricular", "protector"],
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 70}}]
+          },
+          {
+            "value": "Otra consulta",
+            "synonyms": [],
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 75}}]
+          },
+          {
+            "type": "else",
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 75}}]
+          }
+        ]
+      }
+    ],
+    "no_answer": {
+      "handler": "goto",
+      "params": {"step": 80, "type": "question"}
+    }
+  },
+
+  "1": {
+    "block_uuid": "00000000-0000-4000-8000-000000000001",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "¿Qué modelo de iPhone estás buscando?",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      }
+    ],
+    "answer": [
+      {
+        "handler": "buttons",
+        "params": [
+          {"value": "_hot",      "synonyms": ["lo quiero","voy hoy","puedo pasar","tienen stock","me lo reservan","aceptan transferencia","paso esta tarde","puedo verlo","donde estan","donde están","paso hoy","voy a pasar"], "params": [{"handler": "goto", "params": {"type": "question", "step": 90}}]},
+          {"value": "_cap",      "synonyms": ["256","512","1 tb","1tb","1 tera","un tera","1t"], "params": [{"handler": "goto", "params": {"type": "question", "step": 2}}]},
+          {"value": "iPhone 17 Pro Max",  "synonyms": ["17 pro max","17 pro maxi","iphone 17 pro max"],  "params": [{"handler": "goto", "params": {"type": "question", "step": 100}}]},
+          {"value": "iPhone 17 Pro",      "synonyms": ["17 pro","iphone 17 pro"],                        "params": [{"handler": "goto", "params": {"type": "question", "step": 101}}]},
+          {"value": "iPhone 17",          "synonyms": ["iphone 17","el 17","un 17"],                     "params": [{"handler": "goto", "params": {"type": "question", "step": 102}}]},
+          {"value": "iPhone 16 Pro Max",  "synonyms": ["16 pro max","16 pro maxi","iphone 16 pro max"],  "params": [{"handler": "goto", "params": {"type": "question", "step": 103}}]},
+          {"value": "iPhone 16 Pro",      "synonyms": ["16 pro","iphone 16 pro"],                        "params": [{"handler": "goto", "params": {"type": "question", "step": 104}}]},
+          {"value": "_16plus",            "synonyms": ["16 plus","iphone 16 plus"],                      "params": [{"handler": "goto", "params": {"type": "question", "step": 125}}]},
+          {"value": "iPhone 16",          "synonyms": ["iphone 16","el 16","un 16"],                     "params": [{"handler": "goto", "params": {"type": "question", "step": 105}}]},
+          {"value": "iPhone 15 Pro Max",  "synonyms": ["15 pro max","15 pro maxi","iphone 15 pro max"],  "params": [{"handler": "goto", "params": {"type": "question", "step": 106}}]},
+          {"value": "iPhone 15 Pro",      "synonyms": ["15 pro","iphone 15 pro","quince pro"],           "params": [{"handler": "goto", "params": {"type": "question", "step": 107}}]},
+          {"value": "_15plus",            "synonyms": ["15 plus","iphone 15 plus"],                      "params": [{"handler": "goto", "params": {"type": "question", "step": 125}}]},
+          {"value": "iPhone 15",          "synonyms": ["iphone 15","el 15","un 15"],                     "params": [{"handler": "goto", "params": {"type": "question", "step": 108}}]},
+          {"value": "iPhone 14 Pro Max",  "synonyms": ["14 pro max","14 pro maxi","iphone 14 pro max"],  "params": [{"handler": "goto", "params": {"type": "question", "step": 109}}]},
+          {"value": "iPhone 14 Pro",      "synonyms": ["14 pro","iphone 14 pro","catorce pro"],          "params": [{"handler": "goto", "params": {"type": "question", "step": 110}}]},
+          {"value": "_14plus",            "synonyms": ["14 plus","iphone 14 plus"],                      "params": [{"handler": "goto", "params": {"type": "question", "step": 125}}]},
+          {"value": "iPhone 14",          "synonyms": ["iphone 14","el 14","un 14"],                     "params": [{"handler": "goto", "params": {"type": "question", "step": 111}}]},
+          {"value": "iPhone 13 Pro Max",  "synonyms": ["13 pro max","13 pro maxi","iphone 13 pro max"],  "params": [{"handler": "goto", "params": {"type": "question", "step": 112}}]},
+          {"value": "iPhone 13 Pro",      "synonyms": ["13 pro","iphone 13 pro","trece pro"],            "params": [{"handler": "goto", "params": {"type": "question", "step": 113}}]},
+          {"value": "_13mini",            "synonyms": ["13 mini","iphone 13 mini"],                      "params": [{"handler": "goto", "params": {"type": "question", "step": 125}}]},
+          {"value": "iPhone 13",          "synonyms": ["iphone 13","el 13","un 13"],                     "params": [{"handler": "goto", "params": {"type": "question", "step": 114}}]},
+          {"value": "iPhone 12 Pro Max",  "synonyms": ["12 pro max","12 pro maxi","iphone 12 pro max"],  "params": [{"handler": "goto", "params": {"type": "question", "step": 115}}]},
+          {"value": "_12pro",             "synonyms": ["12 pro","iphone 12 pro"],                        "params": [{"handler": "goto", "params": {"type": "question", "step": 125}}]},
+          {"value": "iPhone 12 Mini",     "synonyms": ["12 mini","iphone 12 mini"],                      "params": [{"handler": "goto", "params": {"type": "question", "step": 116}}]},
+          {"value": "iPhone 12",          "synonyms": ["iphone 12","el 12","un 12"],                     "params": [{"handler": "goto", "params": {"type": "question", "step": 117}}]},
+          {"value": "iPhone 11 Pro Max",  "synonyms": ["11 pro max","11 pro maxi","iphone 11 pro max"],  "params": [{"handler": "goto", "params": {"type": "question", "step": 118}}]},
+          {"value": "_11pro",             "synonyms": ["11 pro","iphone 11 pro"],                        "params": [{"handler": "goto", "params": {"type": "question", "step": 125}}]},
+          {"value": "iPhone 11",          "synonyms": ["iphone 11","el 11","un 11"],                     "params": [{"handler": "goto", "params": {"type": "question", "step": 119}}]},
+          {"value": "iPhone XS Max",      "synonyms": ["xs max","xs maxi","iphone xs max"],              "params": [{"handler": "goto", "params": {"type": "question", "step": 120}}]},
+          {"value": "_xs",                "synonyms": ["iphone xs","el xs"],                             "params": [{"handler": "goto", "params": {"type": "question", "step": 125}}]},
+          {"value": "iPhone XR",          "synonyms": ["xr","iphone xr","el xr"],                       "params": [{"handler": "goto", "params": {"type": "question", "step": 121}}]},
+          {"value": "iPhone 8 Plus",      "synonyms": ["8 plus","iphone 8 plus"],                        "params": [{"handler": "goto", "params": {"type": "question", "step": 123}}]},
+          {"value": "iPhone 8",           "synonyms": ["iphone 8","el 8","un 8"],                        "params": [{"handler": "goto", "params": {"type": "question", "step": 124}}]},
+          {"value": "iPhone X",           "synonyms": ["iphone x","el x","un x"],                        "params": [{"handler": "goto", "params": {"type": "question", "step": 122}}]},
+          {"type": "else", "params": [{"handler": "goto", "params": {"type": "question", "step": 125}}]}
+        ]
+      }
+    ],
+    "no_answer": {"handler": "goto", "params": {"step": 80, "type": "question"}}
+  },
+
+  "2": {
+    "block_uuid": "00000000-0000-4000-8000-000000000002",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "¿Lo buscabas en la capacidad base (128 GB) o en una versión de mayor almacenamiento? Para capacidades de 256 GB en adelante, un asesor de GreatPhones te da el precio exacto. ¿Te queda cómodo pasar a consultarlo?",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      }
+    ],
+    "answer": [
+      {
+        "handler": "buttons",
+        "params": [
+          {
+            "value": "_hot",
+            "synonyms": ["lo quiero","voy hoy","puedo pasar","tienen stock","me lo reservan","aceptan transferencia","paso esta tarde","puedo verlo","donde estan","donde están","paso hoy","voy a pasar","si","dale","voy"],
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 90}}]
+          },
+          {
+            "type": "else",
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 6}}]
+          }
+        ]
+      }
+    ],
+    "no_answer": {"handler": "goto", "params": {"step": 80, "type": "question"}}
+  },
+
+  "5": {
+    "block_uuid": "00000000-0000-4000-8000-000000000005",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "¿Te queda cómodo pasar a verlo? Lo podés revisar sin compromiso. 📱",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      }
+    ],
+    "answer": [
+      {
+        "handler": "buttons",
+        "params": [
+          {
+            "value": "_hot",
+            "synonyms": ["lo quiero","voy hoy","puedo pasar","si","dale","voy","paso hoy","voy a pasar","me lo reservan","aceptan transferencia","paso esta tarde","puedo verlo","donde estan","donde están"],
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 90}}]
+          },
+          {
+            "type": "else",
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 6}}]
+          }
+        ]
+      }
+    ],
+    "no_answer": {"handler": "goto", "params": {"step": 80, "type": "question"}}
+  },
+
+  "6": {
+    "block_uuid": "00000000-0000-4000-8000-000000000006",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "Cualquier consulta, estamos acá. Un asesor de GreatPhones se comunica con vos en breve. 📱",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      },
+      {
+        "handler": "goto",
+        "params": {"type": "finish", "step": 1}
+      }
+    ]
+  },
+
+  "20": {
+    "block_uuid": "00000000-0000-4000-8000-000000000014",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "¿Qué modelo de iPhone querés entregar?",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      }
+    ],
+    "answer": [
+      {
+        "handler": "buttons",
+        "params": [
+          {"value": "_hot",      "synonyms": ["lo quiero","voy hoy","puedo pasar","tienen stock","me lo reservan","aceptan transferencia","paso esta tarde","puedo verlo","donde estan","donde están","paso hoy","voy a pasar"], "params": [{"handler": "goto", "params": {"type": "question", "step": 90}}]},
+          {"value": "iPhone 17 Pro Max",  "synonyms": ["17 pro max","17 pro maxi","iphone 17 pro max"],  "params": [{"handler": "goto", "params": {"type": "question", "step": 200}}]},
+          {"value": "iPhone 17 Pro",      "synonyms": ["17 pro","iphone 17 pro"],                        "params": [{"handler": "goto", "params": {"type": "question", "step": 201}}]},
+          {"value": "iPhone 17",          "synonyms": ["iphone 17","el 17","un 17"],                     "params": [{"handler": "goto", "params": {"type": "question", "step": 202}}]},
+          {"value": "iPhone 16 Pro Max",  "synonyms": ["16 pro max","16 pro maxi","iphone 16 pro max"],  "params": [{"handler": "goto", "params": {"type": "question", "step": 203}}]},
+          {"value": "iPhone 16 Pro",      "synonyms": ["16 pro","iphone 16 pro"],                        "params": [{"handler": "goto", "params": {"type": "question", "step": 204}}]},
+          {"value": "_16plus",            "synonyms": ["16 plus","iphone 16 plus"],                      "params": [{"handler": "goto", "params": {"type": "question", "step": 225}}]},
+          {"value": "iPhone 16",          "synonyms": ["iphone 16","el 16","un 16"],                     "params": [{"handler": "goto", "params": {"type": "question", "step": 205}}]},
+          {"value": "iPhone 15 Pro Max",  "synonyms": ["15 pro max","15 pro maxi","iphone 15 pro max"],  "params": [{"handler": "goto", "params": {"type": "question", "step": 206}}]},
+          {"value": "iPhone 15 Pro",      "synonyms": ["15 pro","iphone 15 pro","quince pro"],           "params": [{"handler": "goto", "params": {"type": "question", "step": 207}}]},
+          {"value": "_15plus",            "synonyms": ["15 plus","iphone 15 plus"],                      "params": [{"handler": "goto", "params": {"type": "question", "step": 225}}]},
+          {"value": "iPhone 15",          "synonyms": ["iphone 15","el 15","un 15"],                     "params": [{"handler": "goto", "params": {"type": "question", "step": 208}}]},
+          {"value": "iPhone 14 Pro Max",  "synonyms": ["14 pro max","14 pro maxi","iphone 14 pro max"],  "params": [{"handler": "goto", "params": {"type": "question", "step": 209}}]},
+          {"value": "iPhone 14 Pro",      "synonyms": ["14 pro","iphone 14 pro","catorce pro"],          "params": [{"handler": "goto", "params": {"type": "question", "step": 210}}]},
+          {"value": "_14plus",            "synonyms": ["14 plus","iphone 14 plus"],                      "params": [{"handler": "goto", "params": {"type": "question", "step": 225}}]},
+          {"value": "iPhone 14",          "synonyms": ["iphone 14","el 14","un 14"],                     "params": [{"handler": "goto", "params": {"type": "question", "step": 211}}]},
+          {"value": "iPhone 13 Pro Max",  "synonyms": ["13 pro max","13 pro maxi","iphone 13 pro max"],  "params": [{"handler": "goto", "params": {"type": "question", "step": 212}}]},
+          {"value": "iPhone 13 Pro",      "synonyms": ["13 pro","iphone 13 pro","trece pro"],            "params": [{"handler": "goto", "params": {"type": "question", "step": 213}}]},
+          {"value": "_13mini",            "synonyms": ["13 mini","iphone 13 mini"],                      "params": [{"handler": "goto", "params": {"type": "question", "step": 225}}]},
+          {"value": "iPhone 13",          "synonyms": ["iphone 13","el 13","un 13"],                     "params": [{"handler": "goto", "params": {"type": "question", "step": 214}}]},
+          {"value": "iPhone 12 Pro Max",  "synonyms": ["12 pro max","12 pro maxi","iphone 12 pro max"],  "params": [{"handler": "goto", "params": {"type": "question", "step": 215}}]},
+          {"value": "_12pro",             "synonyms": ["12 pro","iphone 12 pro"],                        "params": [{"handler": "goto", "params": {"type": "question", "step": 225}}]},
+          {"value": "iPhone 12 Mini",     "synonyms": ["12 mini","iphone 12 mini"],                      "params": [{"handler": "goto", "params": {"type": "question", "step": 216}}]},
+          {"value": "iPhone 12",          "synonyms": ["iphone 12","el 12","un 12"],                     "params": [{"handler": "goto", "params": {"type": "question", "step": 217}}]},
+          {"value": "iPhone 11 Pro Max",  "synonyms": ["11 pro max","11 pro maxi","iphone 11 pro max"],  "params": [{"handler": "goto", "params": {"type": "question", "step": 218}}]},
+          {"value": "_11pro",             "synonyms": ["11 pro","iphone 11 pro"],                        "params": [{"handler": "goto", "params": {"type": "question", "step": 225}}]},
+          {"value": "iPhone 11",          "synonyms": ["iphone 11","el 11","un 11"],                     "params": [{"handler": "goto", "params": {"type": "question", "step": 219}}]},
+          {"value": "iPhone XS Max",      "synonyms": ["xs max","xs maxi","iphone xs max"],              "params": [{"handler": "goto", "params": {"type": "question", "step": 220}}]},
+          {"value": "_xs",                "synonyms": ["iphone xs","el xs"],                             "params": [{"handler": "goto", "params": {"type": "question", "step": 225}}]},
+          {"value": "iPhone XR",          "synonyms": ["xr","iphone xr","el xr"],                       "params": [{"handler": "goto", "params": {"type": "question", "step": 221}}]},
+          {"value": "iPhone 8 Plus",      "synonyms": ["8 plus","iphone 8 plus"],                        "params": [{"handler": "goto", "params": {"type": "question", "step": 223}}]},
+          {"value": "iPhone 8",           "synonyms": ["iphone 8","el 8","un 8"],                        "params": [{"handler": "goto", "params": {"type": "question", "step": 224}}]},
+          {"value": "iPhone X",           "synonyms": ["iphone x","el x","un x"],                        "params": [{"handler": "goto", "params": {"type": "question", "step": 222}}]},
+          {"type": "else", "params": [{"handler": "goto", "params": {"type": "question", "step": 225}}]}
+        ]
+      }
+    ],
+    "no_answer": {"handler": "goto", "params": {"step": 80, "type": "question"}}
+  },
+
+  "46": {
+    "block_uuid": "00000000-0000-4000-8000-00000000002e",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "¿Y qué modelo te interesa llevarte?",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      }
+    ],
+    "answer": [
+      {
+        "handler": "buttons",
+        "params": [
+          {
+            "value": "_hot",
+            "synonyms": ["lo quiero","voy hoy","puedo pasar","tienen stock","me lo reservan","aceptan transferencia","paso esta tarde","puedo verlo","donde estan","donde están","paso hoy","voy a pasar"],
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 90}}]
+          },
+          {
+            "type": "else",
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 47}}]
+          }
+        ]
+      }
+    ],
+    "no_answer": {"handler": "goto", "params": {"step": 80, "type": "question"}}
+  },
+
+  "47": {
+    "block_uuid": "00000000-0000-4000-8000-00000000002f",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "Perfecto, ya registramos todo. Un asesor de GreatPhones te contacta para coordinar el canje. 📱",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      },
+      {
+        "handler": "goto",
+        "params": {"type": "finish", "step": 2}
+      }
+    ]
+  },
+
+  "50": {
+    "block_uuid": "00000000-0000-4000-8000-000000000032",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "¿Qué modelo de iPhone es?",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      }
+    ],
+    "answer": [
+      {
+        "handler": "buttons",
+        "params": [
+          {
+            "value": "_hot",
+            "synonyms": ["lo quiero","voy hoy","puedo pasar","donde estan","donde están","paso esta tarde","paso hoy"],
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 90}}]
+          },
+          {
+            "type": "else",
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 51}}]
+          }
+        ]
+      }
+    ],
+    "no_answer": {"handler": "goto", "params": {"step": 80, "type": "question"}}
+  },
+
+  "51": {
+    "block_uuid": "00000000-0000-4000-8000-000000000033",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "¿Cuál es el problema o qué le está pasando?",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      }
+    ],
+    "answer": [
+      {
+        "handler": "buttons",
+        "params": [
+          {
+            "value": "_hot",
+            "synonyms": ["lo quiero","voy hoy","puedo pasar","donde estan","donde están","paso esta tarde","paso hoy"],
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 90}}]
+          },
+          {
+            "type": "else",
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 59}}]
+          }
+        ]
+      }
+    ],
+    "no_answer": {"handler": "goto", "params": {"step": 80, "type": "question"}}
+  },
+
+  "59": {
+    "block_uuid": "00000000-0000-4000-8000-00000000003b",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "Gracias, ya registramos el equipo y el problema. Un técnico de GreatPhones te da una respuesta pronto. 🔧",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      },
+      {
+        "handler": "goto",
+        "params": {"type": "finish", "step": 3}
+      }
+    ]
+  },
+
+  "60": {
+    "block_uuid": "00000000-0000-4000-8000-00000000003c",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "¿Qué modelo de iPhone tenés?",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      }
+    ],
+    "answer": [
+      {
+        "handler": "buttons",
+        "params": [
+          {
+            "type": "else",
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 61}}]
+          }
+        ]
+      }
+    ],
+    "no_answer": {"handler": "goto", "params": {"step": 80, "type": "question"}}
+  },
+
+  "61": {
+    "block_uuid": "00000000-0000-4000-8000-00000000003d",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "¿Aproximadamente cuándo lo compraste en GreatPhones?",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      }
+    ],
+    "answer": [
+      {
+        "handler": "buttons",
+        "params": [
+          {
+            "type": "else",
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 69}}]
+          }
+        ]
+      }
+    ],
+    "no_answer": {"handler": "goto", "params": {"step": 80, "type": "question"}}
+  },
+
+  "69": {
+    "block_uuid": "00000000-0000-4000-8000-000000000045",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "Gracias, ya registramos tu reclamo. Un asesor de GreatPhones te contacta para coordinar. ✅",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      },
+      {
+        "handler": "goto",
+        "params": {"type": "finish", "step": 4}
+      }
+    ]
+  },
+
+  "70": {
+    "block_uuid": "00000000-0000-4000-8000-000000000046",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "¿Para qué modelo de iPhone son los accesorios?",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      }
+    ],
+    "answer": [
+      {
+        "handler": "buttons",
+        "params": [
+          {
+            "value": "_hot",
+            "synonyms": ["lo quiero","voy hoy","puedo pasar","donde estan","donde están","paso esta tarde","paso hoy","voy a pasar"],
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 90}}]
+          },
+          {
+            "type": "else",
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 79}}]
+          }
+        ]
+      }
+    ],
+    "no_answer": {"handler": "goto", "params": {"step": 80, "type": "question"}}
+  },
+
+  "75": {
+    "block_uuid": "00000000-0000-4000-8000-00000000004b",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "Contanos en qué te podemos ayudar.",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      }
+    ],
+    "answer": [
+      {
+        "handler": "buttons",
+        "params": [
+          {
+            "value": "_hot",
+            "synonyms": ["lo quiero","voy hoy","puedo pasar","tienen stock","me lo reservan","aceptan transferencia","paso esta tarde","puedo verlo","donde estan","donde están","paso hoy","voy a pasar"],
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 90}}]
+          },
+          {
+            "type": "else",
+            "params": [{"handler": "goto", "params": {"type": "question", "step": 78}}]
+          }
+        ]
+      }
+    ],
+    "no_answer": {"handler": "goto", "params": {"step": 80, "type": "question"}}
+  },
+
+  "78": {
+    "block_uuid": "00000000-0000-4000-8000-00000000004e",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "Gracias por escribirnos. Un asesor de GreatPhones te responde pronto. 📱",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      },
+      {
+        "handler": "goto",
+        "params": {"type": "finish", "step": 6}
+      }
+    ]
+  },
+
+  "79": {
+    "block_uuid": "00000000-0000-4000-8000-00000000004f",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "Perfecto, ya registramos tu consulta. Un asesor de GreatPhones te contacta pronto. 📱",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      },
+      {
+        "handler": "goto",
+        "params": {"type": "finish", "step": 5}
+      }
+    ]
+  },
+
+  "80": {
+    "block_uuid": "00000000-0000-4000-8000-000000000050",
+    "question": [
+      {
+        "handler": "waits",
+        "params": {
+          "logic": "or",
+          "conditions": [
+            {
+              "event": {"source": "timer", "action": "ended", "delay": 300},
+              "action": {"type": "question", "step": 81}
+            }
+          ]
+        }
+      }
+    ]
+  },
+
+  "81": {
+    "block_uuid": "00000000-0000-4000-8000-000000000051",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "¡Seguimos acá si necesitás algo! 🌟 Un asesor de GreatPhones está disponible para ayudarte.",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      },
+      {
+        "handler": "goto",
+        "params": {"type": "finish", "step": 8}
+      }
+    ]
+  },
+
+  "90": {
+    "block_uuid": "00000000-0000-4000-8000-00000000005a",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "Perfecto, ya tenemos todo anotado. Un asesor de GreatPhones se comunica con vos enseguida. 👌",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      },
+      {
+        "handler": "goto",
+        "params": {"type": "finish", "step": 7}
+      }
+    ]
+  },
+
+  "100": {
+    "block_uuid": "00000000-0000-4000-8000-000000000064",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 17 Pro Max | Capacidad base\n\n💰 Venta normal: $2.100.000\n🏷️ Preventa: $2.000.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "101": {
+    "block_uuid": "00000000-0000-4000-8000-000000000065",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 17 Pro | Capacidad base\n\n💰 Venta normal: $1.950.000\n🏷️ Preventa: $1.850.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "102": {
+    "block_uuid": "00000000-0000-4000-8000-000000000066",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 17 | Capacidad base\n\n💰 Venta normal: $1.400.000\n🏷️ Preventa: $1.310.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "103": {
+    "block_uuid": "00000000-0000-4000-8000-000000000067",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 16 Pro Max | Capacidad base\n\n💰 Venta normal: $1.450.000\n🏷️ Preventa: $1.370.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "104": {
+    "block_uuid": "00000000-0000-4000-8000-000000000068",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 16 Pro | Capacidad base\n\n💰 Venta normal: $1.300.000\n🏷️ Preventa: $1.220.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "105": {
+    "block_uuid": "00000000-0000-4000-8000-000000000069",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 16 | Capacidad base\n\n💰 Venta normal: $1.015.000\n🏷️ Preventa: $960.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "106": {
+    "block_uuid": "00000000-0000-4000-8000-00000000006a",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 15 Pro Max | Capacidad base\n\n💰 Venta normal: $1.300.000\n🏷️ Preventa: $1.200.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "107": {
+    "block_uuid": "00000000-0000-4000-8000-00000000006b",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 15 Pro | Capacidad base\n\n💰 Venta normal: $1.015.000\n🏷️ Preventa: $960.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "108": {
+    "block_uuid": "00000000-0000-4000-8000-00000000006c",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 15 | Capacidad base\n\n💰 Venta normal: $870.000\n🏷️ Preventa: $820.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "109": {
+    "block_uuid": "00000000-0000-4000-8000-00000000006d",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 14 Pro Max | Capacidad base\n\n💰 Venta normal: $940.000\n🏷️ Preventa: $890.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "110": {
+    "block_uuid": "00000000-0000-4000-8000-00000000006e",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 14 Pro | Capacidad base\n\n💰 Venta normal: $870.000\n🏷️ Preventa: $820.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "111": {
+    "block_uuid": "00000000-0000-4000-8000-00000000006f",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 14 | Capacidad base\n\n💰 Venta normal: $650.000\n🏷️ Preventa: $610.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "112": {
+    "block_uuid": "00000000-0000-4000-8000-000000000070",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 13 Pro Max | Capacidad base\n\n💰 Venta normal: $870.000\n🏷️ Preventa: $820.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "113": {
+    "block_uuid": "00000000-0000-4000-8000-000000000071",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 13 Pro | Capacidad base\n\n💰 Venta normal: $790.000\n🏷️ Preventa: $740.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "114": {
+    "block_uuid": "00000000-0000-4000-8000-000000000072",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 13 | Capacidad base\n\n💰 Venta normal: $580.000\n🏷️ Preventa: $540.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "115": {
+    "block_uuid": "00000000-0000-4000-8000-000000000073",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 12 Pro Max | Capacidad base\n\n💰 Venta normal: $550.000\n🏷️ Preventa: $525.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "116": {
+    "block_uuid": "00000000-0000-4000-8000-000000000074",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 12 Mini | Capacidad base\n\n💰 Venta normal: $400.000\n🏷️ Preventa: $380.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "117": {
+    "block_uuid": "00000000-0000-4000-8000-000000000075",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 12 | Capacidad base\n\n💰 Venta normal: $435.000\n🏷️ Preventa: $400.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "118": {
+    "block_uuid": "00000000-0000-4000-8000-000000000076",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 11 Pro Max | Capacidad base\n\n💰 Venta normal: $450.000\n🏷️ Preventa: $420.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "119": {
+    "block_uuid": "00000000-0000-4000-8000-000000000077",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 11 | Capacidad base\n\n💰 Venta normal: $360.000\n🏷️ Preventa: $330.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "120": {
+    "block_uuid": "00000000-0000-4000-8000-000000000078",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone XS Max | Capacidad base\n\n💰 Venta normal: $320.000\n🏷️ Preventa: $300.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "121": {
+    "block_uuid": "00000000-0000-4000-8000-000000000079",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone XR | Capacidad base\n\n💰 Venta normal: $280.000\n🏷️ Preventa: $260.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "122": {
+    "block_uuid": "00000000-0000-4000-8000-00000000007a",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone X | Capacidad base\n\n💰 Venta normal: $250.000\n🏷️ Preventa: $240.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "123": {
+    "block_uuid": "00000000-0000-4000-8000-00000000007b",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 8 Plus | Capacidad base\n\n💰 Venta normal: $220.000\n🏷️ Preventa: $210.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+  "124": {
+    "block_uuid": "00000000-0000-4000-8000-00000000007c",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "iPhone 8 | Capacidad base\n\n💰 Venta normal: $180.000\n🏷️ Preventa: $170.000", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 5}}
+    ]
+  },
+
+  "125": {
+    "block_uuid": "00000000-0000-4000-8000-00000000007d",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "¿Podés contarme un poco más sobre el modelo exacto que buscás? Así te doy la información correcta.",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      },
+      {
+        "handler": "goto",
+        "params": {"type": "question", "step": 6}
+      }
+    ]
+  },
+
+  "200": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000c8",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 17 Pro Max es de $1.600.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "201": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000c9",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 17 Pro es de $1.500.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "202": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000ca",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 17 es de $940.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "203": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000cb",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 16 Pro Max es de $1.160.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "204": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000cc",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 16 Pro es de $1.005.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "205": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000cd",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 16 es de $725.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "206": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000ce",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 15 Pro Max es de $870.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "207": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000cf",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 15 Pro es de $725.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "208": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000d0",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 15 es de $650.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "209": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000d1",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 14 Pro Max es de $650.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "210": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000d2",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 14 Pro es de $570.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "211": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000d3",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 14 es de $430.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "212": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000d4",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 13 Pro Max es de $550.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "213": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000d5",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 13 Pro es de $500.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "214": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000d6",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 13 es de $300.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "215": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000d7",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 12 Pro Max es de $300.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "216": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000d8",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 12 Mini es de $210.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "217": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000d9",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 12 es de $210.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "218": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000da",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 11 Pro Max es de $180.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "219": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000db",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 11 es de $145.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "220": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000dc",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone XS Max es de $170.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "221": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000dd",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone XR es de $140.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "222": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000de",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone X es de $120.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "223": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000df",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 8 Plus es de $100.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+  "224": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000e0",
+    "question": [
+      {"handler": "send_message", "params": {"tag": "", "text": "El valor de toma para el iPhone 8 es de $60.000 📱", "type": "external", "recipient": {"type": "all_contacts", "way_of_communication": "over_all"}, "is_in_starting_block": false, "send_to_all_chat_sources": true, "on_error": null}},
+      {"handler": "goto", "params": {"type": "question", "step": 46}}
+    ]
+  },
+
+  "225": {
+    "block_uuid": "00000000-0000-4000-8000-0000000000e1",
+    "question": [
+      {
+        "handler": "send_message",
+        "params": {
+          "tag": "",
+          "text": "Para ese modelo necesitamos evaluarlo en persona. Un asesor de GreatPhones te contacta para darte el valor de canje. 📱",
+          "type": "external",
+          "recipient": {"type": "all_contacts", "way_of_communication": "over_all"},
+          "is_in_starting_block": false,
+          "send_to_all_chat_sources": true,
+          "on_error": null
+        }
+      },
+      {
+        "handler": "goto",
+        "params": {"type": "question", "step": 46}
+      }
+    ]
+  },
+
+  "conversation": false
+}

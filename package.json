@@ -1,0 +1,32 @@
+{
+  "name": "vendedor-ia",
+  "version": "0.1.0",
+  "description": "Agente de ventas inteligente para e-commerce de tecnología",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "node --env-file .env --watch --import tsx/esm src/api/routes.ts",
+    "build": "tsc",
+    "start": "node dist/api/routes.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "import-history": "tsx scripts/import-history.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "node-cron": "^3.0.3",
+    "openai": "^4.65.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/node-cron": "^3.0.11",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

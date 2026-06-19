@@ -1,0 +1,739 @@
+{
+  "version": 2,
+  "name": "GreatPhones - Bot de Bienvenida v2",
+  "trigger": {
+    "type": "new_message",
+    "pipeline": "VENTAS",
+    "stage": "Nuevo Lead"
+  },
+  "entry_step": "entrada",
+  "variables": [
+    { "name": "categoria",            "type": "text"    },
+    { "name": "modelo_buscado",       "type": "text"    },
+    { "name": "modelo_canje",         "type": "text"    },
+    { "name": "capacidad_especial",   "type": "boolean" },
+    { "name": "modelo_reparacion",    "type": "text"    },
+    { "name": "problema_reparacion",  "type": "text"    },
+    { "name": "modelo_garantia",      "type": "text"    },
+    { "name": "fecha_compra_aprox",   "type": "text"    },
+    { "name": "modelo_accesorios",    "type": "text"    },
+    { "name": "descripcion_consulta", "type": "text"    },
+    { "name": "respuesta_visita",     "type": "text"    },
+    { "name": "modelo_compra_canje",  "type": "text"    }
+  ],
+  "tags": [
+    "compra_iphone",
+    "plan_canje",
+    "reparacion",
+    "garantia",
+    "accesorios",
+    "consulta_general",
+    "lead_caliente",
+    "prioridad_alta",
+    "capacidad_especial"
+  ],
+  "steps": [
+
+    {
+      "id": "entrada",
+      "type": "condition",
+      "rules": [
+        { "field": "message", "operator": "contains", "value": "lo quiero",             "next": "hot_previo" },
+        { "field": "message", "operator": "contains", "value": "voy hoy",               "next": "hot_previo" },
+        { "field": "message", "operator": "contains", "value": "puedo pasar",           "next": "hot_previo" },
+        { "field": "message", "operator": "contains", "value": "tienen stock",          "next": "hot_previo" },
+        { "field": "message", "operator": "contains", "value": "me lo reservan",        "next": "hot_previo" },
+        { "field": "message", "operator": "contains", "value": "aceptan transferencia", "next": "hot_previo" },
+        { "field": "message", "operator": "contains", "value": "paso esta tarde",       "next": "hot_previo" },
+        { "field": "message", "operator": "contains", "value": "puedo verlo",           "next": "hot_previo" },
+        { "field": "message", "operator": "contains", "value": "donde estan",           "next": "hot_previo" },
+        { "field": "message", "operator": "contains", "value": "donde estan",           "next": "hot_previo" }
+      ],
+      "default_next": "bienvenida"
+    },
+
+    {
+      "id": "hot_previo",
+      "type": "action",
+      "actions": [
+        { "type": "add_tag",                "value": "lead_caliente"  },
+        { "type": "add_tag",                "value": "prioridad_alta" },
+        { "type": "move_to_pipeline_stage", "pipeline": "VENTAS", "stage": "Interesado" }
+      ],
+      "next": "msg_hot_previo"
+    },
+
+    {
+      "id": "msg_hot_previo",
+      "type": "message",
+      "text": "Hola! Gracias por escribirnos. Ya tomamos nota y un asesor de GreatPhones te escribe enseguida."
+    },
+
+    {
+      "id": "bienvenida",
+      "type": "message",
+      "text": "Hola! Bienvenido/a a GreatPhones\n\nSomos especialistas en iPhone. Estamos aca para ayudarte.",
+      "next": "menu"
+    },
+
+    {
+      "id": "menu",
+      "type": "buttons",
+      "text": "En que te podemos ayudar hoy?",
+      "buttons": [
+        { "id": "op_compra", "text": "Comprar iPhone" },
+        { "id": "op_canje",  "text": "Plan Canje"     },
+        { "id": "op_rep",    "text": "Reparacion"     },
+        { "id": "op_gar",    "text": "Garantia"       },
+        { "id": "op_acc",    "text": "Accesorios"     },
+        { "id": "op_cg",     "text": "Otra consulta"  }
+      ],
+      "next": "detect_categoria"
+    },
+
+    {
+      "id": "detect_categoria",
+      "type": "condition",
+      "rules": [
+        { "field": "button",  "operator": "equals",   "value": "op_compra",   "next": "compra_tag" },
+        { "field": "button",  "operator": "equals",   "value": "op_canje",    "next": "canje_tag"  },
+        { "field": "button",  "operator": "equals",   "value": "op_rep",      "next": "rep_tag"    },
+        { "field": "button",  "operator": "equals",   "value": "op_gar",      "next": "gar_tag"    },
+        { "field": "button",  "operator": "equals",   "value": "op_acc",      "next": "acc_tag"    },
+        { "field": "button",  "operator": "equals",   "value": "op_cg",       "next": "cg_tag"     },
+        { "field": "message", "operator": "contains", "value": "comprar",     "next": "compra_tag" },
+        { "field": "message", "operator": "contains", "value": "precio",      "next": "compra_tag" },
+        { "field": "message", "operator": "contains", "value": "cuanto sale", "next": "compra_tag" },
+        { "field": "message", "operator": "contains", "value": "cuanto sale", "next": "compra_tag" },
+        { "field": "message", "operator": "contains", "value": "iphone",      "next": "compra_tag" },
+        { "field": "message", "operator": "contains", "value": "quiero",      "next": "compra_tag" },
+        { "field": "message", "operator": "contains", "value": "canje",       "next": "canje_tag"  },
+        { "field": "message", "operator": "contains", "value": "permuta",     "next": "canje_tag"  },
+        { "field": "message", "operator": "contains", "value": "entregar",    "next": "canje_tag"  },
+        { "field": "message", "operator": "contains", "value": "cuanto me",   "next": "canje_tag"  },
+        { "field": "message", "operator": "contains", "value": "cuanto me",   "next": "canje_tag"  },
+        { "field": "message", "operator": "contains", "value": "reparaci",    "next": "rep_tag"    },
+        { "field": "message", "operator": "contains", "value": "arreglar",    "next": "rep_tag"    },
+        { "field": "message", "operator": "contains", "value": "pantalla",    "next": "rep_tag"    },
+        { "field": "message", "operator": "contains", "value": "bateria",     "next": "rep_tag"    },
+        { "field": "message", "operator": "contains", "value": "roto",        "next": "rep_tag"    },
+        { "field": "message", "operator": "contains", "value": "garantia",    "next": "gar_tag"    },
+        { "field": "message", "operator": "contains", "value": "accesorio",   "next": "acc_tag"    },
+        { "field": "message", "operator": "contains", "value": "funda",       "next": "acc_tag"    },
+        { "field": "message", "operator": "contains", "value": "cable",       "next": "acc_tag"    },
+        { "field": "message", "operator": "contains", "value": "cargador",    "next": "acc_tag"    }
+      ],
+      "default_next": "cg_tag"
+    },
+
+    {
+      "id": "compra_tag",
+      "type": "action",
+      "actions": [
+        { "type": "add_tag",          "value": "compra_iphone" },
+        { "type": "set_custom_field", "field": "categoria", "value": "compra_iphone" }
+      ],
+      "next": "compra_q1"
+    },
+
+    {
+      "id": "compra_q1",
+      "type": "question",
+      "text": "Que modelo de iPhone estas buscando?",
+      "save_to": "modelo_buscado",
+      "next": "compra_check_capacidad"
+    },
+
+    {
+      "id": "compra_check_capacidad",
+      "type": "condition",
+      "rules": [
+        { "field": "message", "operator": "contains", "value": "256",     "next": "compra_cap_action" },
+        { "field": "message", "operator": "contains", "value": "512",     "next": "compra_cap_action" },
+        { "field": "message", "operator": "contains", "value": "1 tb",    "next": "compra_cap_action" },
+        { "field": "message", "operator": "contains", "value": "1tb",     "next": "compra_cap_action" },
+        { "field": "message", "operator": "contains", "value": "1 tera",  "next": "compra_cap_action" },
+        { "field": "message", "operator": "contains", "value": "un tera", "next": "compra_cap_action" },
+        { "field": "message", "operator": "contains", "value": "1tera",   "next": "compra_cap_action" }
+      ],
+      "default_next": "compra_detect_modelo"
+    },
+
+    {
+      "id": "compra_cap_action",
+      "type": "action",
+      "actions": [
+        { "type": "add_tag",          "value": "capacidad_especial" },
+        { "type": "set_custom_field", "field": "capacidad_especial", "value": "true" }
+      ],
+      "next": "compra_cap_msg"
+    },
+
+    {
+      "id": "compra_cap_msg",
+      "type": "question",
+      "text": "Lo buscabas en la capacidad base o en una version de mayor almacenamiento?",
+      "save_to": "respuesta_visita",
+      "next": "compra_cap_hot_check"
+    },
+
+    {
+      "id": "compra_cap_hot_check",
+      "type": "condition",
+      "rules": [
+        { "field": "message", "operator": "contains", "value": "lo quiero",             "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "voy hoy",               "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "puedo pasar",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "tienen stock",          "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "me lo reservan",        "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "aceptan transferencia", "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "paso esta tarde",       "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "puedo verlo",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "donde estan",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "donde estan",           "next": "hot_action" }
+      ],
+      "default_next": "compra_cap_note"
+    },
+
+    {
+      "id": "compra_cap_note",
+      "type": "action",
+      "actions": [
+        { "type": "add_note", "text": "Bot - Compra iPhone con capacidad especial (256/512/1TB). Modelo: {modelo_buscado}. Requiere confirmacion de version y precio." }
+      ],
+      "next": "compra_stage"
+    },
+
+    {
+      "id": "compra_detect_modelo",
+      "type": "condition",
+      "rules": [
+        { "field": "message", "operator": "contains", "value": "17 pro max",  "next": "c_p_17promax" },
+        { "field": "message", "operator": "contains", "value": "17 pro maxi", "next": "c_p_17promax" },
+        { "field": "message", "operator": "contains", "value": "17 pro",      "next": "c_p_17pro"    },
+        { "field": "message", "operator": "contains", "value": "17",          "next": "c_p_17"       },
+        { "field": "message", "operator": "contains", "value": "16 pro max",  "next": "c_p_16promax" },
+        { "field": "message", "operator": "contains", "value": "16 pro maxi", "next": "c_p_16promax" },
+        { "field": "message", "operator": "contains", "value": "16 pro",      "next": "c_p_16pro"    },
+        { "field": "message", "operator": "contains", "value": "16 plus",     "next": "c_no_tabla"   },
+        { "field": "message", "operator": "contains", "value": "16",          "next": "c_p_16"       },
+        { "field": "message", "operator": "contains", "value": "15 pro max",  "next": "c_p_15promax" },
+        { "field": "message", "operator": "contains", "value": "15 pro maxi", "next": "c_p_15promax" },
+        { "field": "message", "operator": "contains", "value": "15 pro",      "next": "c_p_15pro"    },
+        { "field": "message", "operator": "contains", "value": "quince pro",  "next": "c_p_15pro"    },
+        { "field": "message", "operator": "contains", "value": "15 plus",     "next": "c_no_tabla"   },
+        { "field": "message", "operator": "contains", "value": "15",          "next": "c_p_15"       },
+        { "field": "message", "operator": "contains", "value": "14 pro max",  "next": "c_p_14promax" },
+        { "field": "message", "operator": "contains", "value": "14 pro maxi", "next": "c_p_14promax" },
+        { "field": "message", "operator": "contains", "value": "14 pro",      "next": "c_p_14pro"    },
+        { "field": "message", "operator": "contains", "value": "catorce pro", "next": "c_p_14pro"    },
+        { "field": "message", "operator": "contains", "value": "14 plus",     "next": "c_no_tabla"   },
+        { "field": "message", "operator": "contains", "value": "14",          "next": "c_p_14"       },
+        { "field": "message", "operator": "contains", "value": "13 pro max",  "next": "c_p_13promax" },
+        { "field": "message", "operator": "contains", "value": "13 pro maxi", "next": "c_p_13promax" },
+        { "field": "message", "operator": "contains", "value": "13 pro",      "next": "c_p_13pro"    },
+        { "field": "message", "operator": "contains", "value": "trece pro",   "next": "c_p_13pro"    },
+        { "field": "message", "operator": "contains", "value": "13 mini",     "next": "c_no_tabla"   },
+        { "field": "message", "operator": "contains", "value": "13",          "next": "c_p_13"       },
+        { "field": "message", "operator": "contains", "value": "12 pro max",  "next": "c_p_12promax" },
+        { "field": "message", "operator": "contains", "value": "12 pro maxi", "next": "c_p_12promax" },
+        { "field": "message", "operator": "contains", "value": "12 pro",      "next": "c_no_tabla"   },
+        { "field": "message", "operator": "contains", "value": "12 mini",     "next": "c_p_12mini"   },
+        { "field": "message", "operator": "contains", "value": "12",          "next": "c_p_12"       },
+        { "field": "message", "operator": "contains", "value": "11 pro max",  "next": "c_p_11promax" },
+        { "field": "message", "operator": "contains", "value": "11 pro maxi", "next": "c_p_11promax" },
+        { "field": "message", "operator": "contains", "value": "11 pro",      "next": "c_no_tabla"   },
+        { "field": "message", "operator": "contains", "value": "11",          "next": "c_p_11"       },
+        { "field": "message", "operator": "contains", "value": "xs max",      "next": "c_p_xsmax"    },
+        { "field": "message", "operator": "contains", "value": "xs maxi",     "next": "c_p_xsmax"    },
+        { "field": "message", "operator": "contains", "value": "xs",          "next": "c_no_tabla"   },
+        { "field": "message", "operator": "contains", "value": "xr",          "next": "c_p_xr"       },
+        { "field": "message", "operator": "contains", "value": "8 plus",      "next": "c_p_8plus"    },
+        { "field": "message", "operator": "contains", "value": "8",           "next": "c_p_8"        },
+        { "field": "message", "operator": "contains", "value": "x",           "next": "c_p_x"        }
+      ],
+      "default_next": "c_no_tabla"
+    },
+
+    { "id": "c_p_17promax", "type": "question", "text": "iPhone 17 Pro Max | Capacidad base\n\nVenta normal: $2.100.000\nPreventa: $2.000.000\n\nTe queda comodo pasar a verlo?", "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_17pro",    "type": "question", "text": "iPhone 17 Pro | Capacidad base\n\nVenta normal: $1.950.000\nPreventa: $1.850.000\n\nTe queda comodo pasar a verlo?",    "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_17",       "type": "question", "text": "iPhone 17 | Capacidad base\n\nVenta normal: $1.400.000\nPreventa: $1.310.000\n\nTe queda comodo pasar a verlo?",       "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_16promax", "type": "question", "text": "iPhone 16 Pro Max | Capacidad base\n\nVenta normal: $1.450.000\nPreventa: $1.370.000\n\nTe queda comodo pasar a verlo?", "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_16pro",    "type": "question", "text": "iPhone 16 Pro | Capacidad base\n\nVenta normal: $1.300.000\nPreventa: $1.220.000\n\nTe queda comodo pasar a verlo?",    "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_16",       "type": "question", "text": "iPhone 16 | Capacidad base\n\nVenta normal: $1.015.000\nPreventa: $960.000\n\nTe queda comodo pasar a verlo?",       "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_15promax", "type": "question", "text": "iPhone 15 Pro Max | Capacidad base\n\nVenta normal: $1.300.000\nPreventa: $1.200.000\n\nTe queda comodo pasar a verlo?", "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_15pro",    "type": "question", "text": "iPhone 15 Pro | Capacidad base\n\nVenta normal: $1.015.000\nPreventa: $960.000\n\nTe queda comodo pasar a verlo?",    "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_15",       "type": "question", "text": "iPhone 15 | Capacidad base\n\nVenta normal: $870.000\nPreventa: $820.000\n\nTe queda comodo pasar a verlo?",       "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_14promax", "type": "question", "text": "iPhone 14 Pro Max | Capacidad base\n\nVenta normal: $940.000\nPreventa: $890.000\n\nTe queda comodo pasar a verlo?", "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_14pro",    "type": "question", "text": "iPhone 14 Pro | Capacidad base\n\nVenta normal: $870.000\nPreventa: $820.000\n\nTe queda comodo pasar a verlo?",    "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_14",       "type": "question", "text": "iPhone 14 | Capacidad base\n\nVenta normal: $650.000\nPreventa: $610.000\n\nTe queda comodo pasar a verlo?",       "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_13promax", "type": "question", "text": "iPhone 13 Pro Max | Capacidad base\n\nVenta normal: $870.000\nPreventa: $820.000\n\nTe queda comodo pasar a verlo?", "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_13pro",    "type": "question", "text": "iPhone 13 Pro | Capacidad base\n\nVenta normal: $790.000\nPreventa: $740.000\n\nTe queda comodo pasar a verlo?",    "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_13",       "type": "question", "text": "iPhone 13 | Capacidad base\n\nVenta normal: $580.000\nPreventa: $540.000\n\nTe queda comodo pasar a verlo?",       "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_12promax", "type": "question", "text": "iPhone 12 Pro Max | Capacidad base\n\nVenta normal: $550.000\nPreventa: $525.000\n\nTe queda comodo pasar a verlo?", "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_12mini",   "type": "question", "text": "iPhone 12 Mini | Capacidad base\n\nVenta normal: $400.000\nPreventa: $380.000\n\nTe queda comodo pasar a verlo?",   "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_12",       "type": "question", "text": "iPhone 12 | Capacidad base\n\nVenta normal: $435.000\nPreventa: $400.000\n\nTe queda comodo pasar a verlo?",       "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_11promax", "type": "question", "text": "iPhone 11 Pro Max | Capacidad base\n\nVenta normal: $450.000\nPreventa: $420.000\n\nTe queda comodo pasar a verlo?", "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_11",       "type": "question", "text": "iPhone 11 | Capacidad base\n\nVenta normal: $360.000\nPreventa: $330.000\n\nTe queda comodo pasar a verlo?",       "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_xsmax",    "type": "question", "text": "iPhone XS Max | Capacidad base\n\nVenta normal: $320.000\nPreventa: $300.000\n\nTe queda comodo pasar a verlo?",    "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_xr",       "type": "question", "text": "iPhone XR | Capacidad base\n\nVenta normal: $280.000\nPreventa: $260.000\n\nTe queda comodo pasar a verlo?",       "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_x",        "type": "question", "text": "iPhone X | Capacidad base\n\nVenta normal: $250.000\nPreventa: $240.000\n\nTe queda comodo pasar a verlo?",        "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_8plus",    "type": "question", "text": "iPhone 8 Plus | Capacidad base\n\nVenta normal: $220.000\nPreventa: $210.000\n\nTe queda comodo pasar a verlo?",    "save_to": "respuesta_visita", "next": "compra_hot_post" },
+    { "id": "c_p_8",        "type": "question", "text": "iPhone 8 | Capacidad base\n\nVenta normal: $180.000\nPreventa: $170.000\n\nTe queda comodo pasar a verlo?",        "save_to": "respuesta_visita", "next": "compra_hot_post" },
+
+    {
+      "id": "c_no_tabla",
+      "type": "question",
+      "text": "Podes contarme un poco mas sobre el modelo exacto que buscas? Asi te doy la informacion correcta.",
+      "save_to": "modelo_buscado",
+      "next": "compra_hot_post"
+    },
+
+    {
+      "id": "compra_hot_post",
+      "type": "condition",
+      "rules": [
+        { "field": "message", "operator": "contains", "value": "lo quiero",             "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "voy hoy",               "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "puedo pasar",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "tienen stock",          "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "me lo reservan",        "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "aceptan transferencia", "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "paso esta tarde",       "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "puedo verlo",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "donde estan",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "donde estan",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "paso hoy",              "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "voy a pasar",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "me anoto",              "next": "hot_action" }
+      ],
+      "default_next": "compra_note"
+    },
+
+    {
+      "id": "compra_note",
+      "type": "action",
+      "actions": [
+        { "type": "add_note", "text": "Bot - Compra iPhone. Modelo consultado: {modelo_buscado}. Precio informado. Pendiente visita/cierre." }
+      ],
+      "next": "compra_stage"
+    },
+
+    {
+      "id": "compra_stage",
+      "type": "action",
+      "actions": [
+        { "type": "move_to_pipeline_stage", "pipeline": "VENTAS", "stage": "Calificando" }
+      ],
+      "next": "compra_close"
+    },
+
+    {
+      "id": "compra_close",
+      "type": "message",
+      "text": "Cualquier otra consulta, estamos aca. Un asesor de GreatPhones se comunica con vos en breve."
+    },
+
+    {
+      "id": "canje_tag",
+      "type": "action",
+      "actions": [
+        { "type": "add_tag",          "value": "plan_canje" },
+        { "type": "set_custom_field", "field": "categoria", "value": "plan_canje" }
+      ],
+      "next": "canje_q1"
+    },
+
+    {
+      "id": "canje_q1",
+      "type": "question",
+      "text": "Que modelo de iPhone queres entregar?",
+      "save_to": "modelo_canje",
+      "next": "canje_detect_modelo"
+    },
+
+    {
+      "id": "canje_detect_modelo",
+      "type": "condition",
+      "rules": [
+        { "field": "message", "operator": "contains", "value": "17 pro max",  "next": "cv_17promax" },
+        { "field": "message", "operator": "contains", "value": "17 pro maxi", "next": "cv_17promax" },
+        { "field": "message", "operator": "contains", "value": "17 pro",      "next": "cv_17pro"    },
+        { "field": "message", "operator": "contains", "value": "17",          "next": "cv_17"       },
+        { "field": "message", "operator": "contains", "value": "16 pro max",  "next": "cv_16promax" },
+        { "field": "message", "operator": "contains", "value": "16 pro maxi", "next": "cv_16promax" },
+        { "field": "message", "operator": "contains", "value": "16 pro",      "next": "cv_16pro"    },
+        { "field": "message", "operator": "contains", "value": "16 plus",     "next": "canje_q_compra" },
+        { "field": "message", "operator": "contains", "value": "16",          "next": "cv_16"       },
+        { "field": "message", "operator": "contains", "value": "15 pro max",  "next": "cv_15promax" },
+        { "field": "message", "operator": "contains", "value": "15 pro maxi", "next": "cv_15promax" },
+        { "field": "message", "operator": "contains", "value": "15 pro",      "next": "cv_15pro"    },
+        { "field": "message", "operator": "contains", "value": "quince pro",  "next": "cv_15pro"    },
+        { "field": "message", "operator": "contains", "value": "15 plus",     "next": "canje_q_compra" },
+        { "field": "message", "operator": "contains", "value": "15",          "next": "cv_15"       },
+        { "field": "message", "operator": "contains", "value": "14 pro max",  "next": "cv_14promax" },
+        { "field": "message", "operator": "contains", "value": "14 pro maxi", "next": "cv_14promax" },
+        { "field": "message", "operator": "contains", "value": "14 pro",      "next": "cv_14pro"    },
+        { "field": "message", "operator": "contains", "value": "14 plus",     "next": "canje_q_compra" },
+        { "field": "message", "operator": "contains", "value": "14",          "next": "cv_14"       },
+        { "field": "message", "operator": "contains", "value": "13 pro max",  "next": "cv_13promax" },
+        { "field": "message", "operator": "contains", "value": "13 pro maxi", "next": "cv_13promax" },
+        { "field": "message", "operator": "contains", "value": "13 pro",      "next": "cv_13pro"    },
+        { "field": "message", "operator": "contains", "value": "13 mini",     "next": "canje_q_compra" },
+        { "field": "message", "operator": "contains", "value": "13",          "next": "cv_13"       },
+        { "field": "message", "operator": "contains", "value": "12 pro max",  "next": "cv_12promax" },
+        { "field": "message", "operator": "contains", "value": "12 pro maxi", "next": "cv_12promax" },
+        { "field": "message", "operator": "contains", "value": "12 pro",      "next": "canje_q_compra" },
+        { "field": "message", "operator": "contains", "value": "12 mini",     "next": "cv_12mini"   },
+        { "field": "message", "operator": "contains", "value": "12",          "next": "cv_12"       },
+        { "field": "message", "operator": "contains", "value": "11 pro max",  "next": "cv_11promax" },
+        { "field": "message", "operator": "contains", "value": "11 pro maxi", "next": "cv_11promax" },
+        { "field": "message", "operator": "contains", "value": "11 pro",      "next": "canje_q_compra" },
+        { "field": "message", "operator": "contains", "value": "11",          "next": "cv_11"       },
+        { "field": "message", "operator": "contains", "value": "xs max",      "next": "cv_xsmax"    },
+        { "field": "message", "operator": "contains", "value": "xs maxi",     "next": "cv_xsmax"    },
+        { "field": "message", "operator": "contains", "value": "xs",          "next": "canje_q_compra" },
+        { "field": "message", "operator": "contains", "value": "xr",          "next": "cv_xr"       },
+        { "field": "message", "operator": "contains", "value": "8 plus",      "next": "cv_8plus"    },
+        { "field": "message", "operator": "contains", "value": "8",           "next": "cv_8"        },
+        { "field": "message", "operator": "contains", "value": "x",           "next": "cv_x"        }
+      ],
+      "default_next": "canje_q_compra"
+    },
+
+    { "id": "cv_17promax", "type": "message", "text": "El valor de toma para el iPhone 17 Pro Max es de $1.600.000", "next": "canje_q_compra" },
+    { "id": "cv_17pro",    "type": "message", "text": "El valor de toma para el iPhone 17 Pro es de $1.500.000",     "next": "canje_q_compra" },
+    { "id": "cv_17",       "type": "message", "text": "El valor de toma para el iPhone 17 es de $940.000",           "next": "canje_q_compra" },
+    { "id": "cv_16promax", "type": "message", "text": "El valor de toma para el iPhone 16 Pro Max es de $1.160.000", "next": "canje_q_compra" },
+    { "id": "cv_16pro",    "type": "message", "text": "El valor de toma para el iPhone 16 Pro es de $1.005.000",     "next": "canje_q_compra" },
+    { "id": "cv_16",       "type": "message", "text": "El valor de toma para el iPhone 16 es de $725.000",           "next": "canje_q_compra" },
+    { "id": "cv_15promax", "type": "message", "text": "El valor de toma para el iPhone 15 Pro Max es de $870.000",   "next": "canje_q_compra" },
+    { "id": "cv_15pro",    "type": "message", "text": "El valor de toma para el iPhone 15 Pro es de $725.000",       "next": "canje_q_compra" },
+    { "id": "cv_15",       "type": "message", "text": "El valor de toma para el iPhone 15 es de $650.000",           "next": "canje_q_compra" },
+    { "id": "cv_14promax", "type": "message", "text": "El valor de toma para el iPhone 14 Pro Max es de $650.000",   "next": "canje_q_compra" },
+    { "id": "cv_14pro",    "type": "message", "text": "El valor de toma para el iPhone 14 Pro es de $570.000",       "next": "canje_q_compra" },
+    { "id": "cv_14",       "type": "message", "text": "El valor de toma para el iPhone 14 es de $430.000",           "next": "canje_q_compra" },
+    { "id": "cv_13promax", "type": "message", "text": "El valor de toma para el iPhone 13 Pro Max es de $550.000",   "next": "canje_q_compra" },
+    { "id": "cv_13pro",    "type": "message", "text": "El valor de toma para el iPhone 13 Pro es de $500.000",       "next": "canje_q_compra" },
+    { "id": "cv_13",       "type": "message", "text": "El valor de toma para el iPhone 13 es de $300.000",           "next": "canje_q_compra" },
+    { "id": "cv_12promax", "type": "message", "text": "El valor de toma para el iPhone 12 Pro Max es de $300.000",   "next": "canje_q_compra" },
+    { "id": "cv_12mini",   "type": "message", "text": "El valor de toma para el iPhone 12 Mini es de $210.000",      "next": "canje_q_compra" },
+    { "id": "cv_12",       "type": "message", "text": "El valor de toma para el iPhone 12 es de $210.000",           "next": "canje_q_compra" },
+    { "id": "cv_11promax", "type": "message", "text": "El valor de toma para el iPhone 11 Pro Max es de $180.000",   "next": "canje_q_compra" },
+    { "id": "cv_11",       "type": "message", "text": "El valor de toma para el iPhone 11 es de $145.000",           "next": "canje_q_compra" },
+    { "id": "cv_xsmax",    "type": "message", "text": "El valor de toma para el iPhone XS Max es de $170.000",       "next": "canje_q_compra" },
+    { "id": "cv_xr",       "type": "message", "text": "El valor de toma para el iPhone XR es de $140.000",           "next": "canje_q_compra" },
+    { "id": "cv_x",        "type": "message", "text": "El valor de toma para el iPhone X es de $120.000",            "next": "canje_q_compra" },
+    { "id": "cv_8plus",    "type": "message", "text": "El valor de toma para el iPhone 8 Plus es de $100.000",       "next": "canje_q_compra" },
+    { "id": "cv_8",        "type": "message", "text": "El valor de toma para el iPhone 8 es de $60.000",             "next": "canje_q_compra" },
+
+    {
+      "id": "canje_q_compra",
+      "type": "question",
+      "text": "Y que modelo te interesa llevarte?",
+      "save_to": "modelo_compra_canje",
+      "next": "canje_hot_check"
+    },
+
+    {
+      "id": "canje_hot_check",
+      "type": "condition",
+      "rules": [
+        { "field": "message", "operator": "contains", "value": "lo quiero",             "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "voy hoy",               "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "puedo pasar",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "tienen stock",          "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "me lo reservan",        "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "aceptan transferencia", "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "paso esta tarde",       "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "puedo verlo",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "donde estan",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "donde estan",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "paso hoy",              "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "voy a pasar",           "next": "hot_action" }
+      ],
+      "default_next": "canje_note"
+    },
+
+    {
+      "id": "canje_note",
+      "type": "action",
+      "actions": [
+        { "type": "add_note", "text": "Bot - Plan Canje. Entrega: {modelo_canje}. Le interesa llevarse: {modelo_compra_canje}." }
+      ],
+      "next": "canje_stage"
+    },
+
+    {
+      "id": "canje_stage",
+      "type": "action",
+      "actions": [
+        { "type": "move_to_pipeline_stage", "pipeline": "VENTAS", "stage": "Calificando" }
+      ],
+      "next": "canje_close"
+    },
+
+    {
+      "id": "canje_close",
+      "type": "message",
+      "text": "Perfecto, ya registramos todo. Un asesor de GreatPhones te contacta para coordinar el canje."
+    },
+
+    {
+      "id": "rep_tag",
+      "type": "action",
+      "actions": [
+        { "type": "add_tag",          "value": "reparacion" },
+        { "type": "set_custom_field", "field": "categoria", "value": "reparacion" }
+      ],
+      "next": "rep_q1"
+    },
+
+    {
+      "id": "rep_q1",
+      "type": "question",
+      "text": "Que modelo de iPhone es?",
+      "save_to": "modelo_reparacion",
+      "next": "rep_q2"
+    },
+
+    {
+      "id": "rep_q2",
+      "type": "question",
+      "text": "Cual es el problema o que le esta pasando?",
+      "save_to": "problema_reparacion",
+      "next": "rep_hot_check"
+    },
+
+    {
+      "id": "rep_hot_check",
+      "type": "condition",
+      "rules": [
+        { "field": "message", "operator": "contains", "value": "lo quiero",             "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "voy hoy",               "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "puedo pasar",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "donde estan",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "donde estan",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "paso esta tarde",       "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "puedo verlo",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "tienen stock",          "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "aceptan transferencia", "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "me lo reservan",        "next": "hot_action" }
+      ],
+      "default_next": "rep_note"
+    },
+
+    {
+      "id": "rep_note",
+      "type": "action",
+      "actions": [
+        { "type": "add_note", "text": "Bot - Reparacion. Modelo: {modelo_reparacion}. Problema: {problema_reparacion}." }
+      ],
+      "next": "rep_stage"
+    },
+
+    {
+      "id": "rep_stage",
+      "type": "action",
+      "actions": [
+        { "type": "move_to_pipeline_stage", "pipeline": "REPARACIONES", "stage": "Consulta" }
+      ],
+      "next": "rep_close"
+    },
+
+    {
+      "id": "rep_close",
+      "type": "message",
+      "text": "Gracias, ya registramos el equipo y el problema. Un tecnico de GreatPhones te da una respuesta pronto."
+    },
+
+    {
+      "id": "gar_tag",
+      "type": "action",
+      "actions": [
+        { "type": "add_tag",          "value": "garantia" },
+        { "type": "set_custom_field", "field": "categoria", "value": "garantia" }
+      ],
+      "next": "gar_q1"
+    },
+
+    {
+      "id": "gar_q1",
+      "type": "question",
+      "text": "Que modelo de iPhone tenes?",
+      "save_to": "modelo_garantia",
+      "next": "gar_q2"
+    },
+
+    {
+      "id": "gar_q2",
+      "type": "question",
+      "text": "Aproximadamente cuando lo compraste en GreatPhones?",
+      "save_to": "fecha_compra_aprox",
+      "next": "gar_note"
+    },
+
+    {
+      "id": "gar_note",
+      "type": "action",
+      "actions": [
+        { "type": "add_note", "text": "Bot - Garantia. Modelo: {modelo_garantia}. Fecha compra aprox.: {fecha_compra_aprox}." }
+      ],
+      "next": "gar_stage"
+    },
+
+    {
+      "id": "gar_stage",
+      "type": "action",
+      "actions": [
+        { "type": "move_to_pipeline_stage", "pipeline": "GARANTIAS", "stage": "Reclamo" }
+      ],
+      "next": "gar_close"
+    },
+
+    {
+      "id": "gar_close",
+      "type": "message",
+      "text": "Gracias, ya registramos tu reclamo. Un asesor de GreatPhones te contacta para coordinar."
+    },
+
+    {
+      "id": "acc_tag",
+      "type": "action",
+      "actions": [
+        { "type": "add_tag",          "value": "accesorios" },
+        { "type": "set_custom_field", "field": "categoria", "value": "accesorios" }
+      ],
+      "next": "acc_q1"
+    },
+
+    {
+      "id": "acc_q1",
+      "type": "question",
+      "text": "Para que modelo de iPhone son los accesorios?",
+      "save_to": "modelo_accesorios",
+      "next": "acc_hot_check"
+    },
+
+    {
+      "id": "acc_hot_check",
+      "type": "condition",
+      "rules": [
+        { "field": "message", "operator": "contains", "value": "lo quiero",             "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "voy hoy",               "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "puedo pasar",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "donde estan",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "donde estan",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "paso esta tarde",       "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "puedo verlo",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "aceptan transferencia", "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "tienen stock",          "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "me lo reservan",        "next": "hot_action" }
+      ],
+      "default_next": "acc_note"
+    },
+
+    {
+      "id": "acc_note",
+      "type": "action",
+      "actions": [
+        { "type": "add_note", "text": "Bot - Accesorios. Modelo: {modelo_accesorios}." }
+      ],
+      "next": "acc_stage"
+    },
+
+    {
+      "id": "acc_stage",
+      "type": "action",
+      "actions": [
+        { "type": "move_to_pipeline_stage", "pipeline": "VENTAS", "stage": "Calificando" }
+      ],
+      "next": "acc_close"
+    },
+
+    {
+      "id": "acc_close",
+      "type": "message",
+      "text": "Perfecto, ya registramos tu consulta. Un asesor de GreatPhones te contacta pronto."
+    },
+
+    {
+      "id": "cg_tag",
+      "type": "action",
+      "actions": [
+        { "type": "add_tag",          "value": "consulta_general" },
+        { "type": "set_custom_field", "field": "categoria", "value": "consulta_general" }
+      ],
+      "next": "cg_q1"
+    },
+
+    {
+      "id": "cg_q1",
+      "type": "question",
+      "text": "Contanos en que te podemos ayudar.",
+      "save_to": "descripcion_consulta",
+      "next": "cg_hot_check"
+    },
+
+    {
+      "id": "cg_hot_check",
+      "type": "condition",
+      "rules": [
+        { "field": "message", "operator": "contains", "value": "lo quiero",             "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "voy hoy",               "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "puedo pasar",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "tienen stock",          "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "me lo reservan",        "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "aceptan transferencia", "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "paso esta tarde",       "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "puedo verlo",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "donde estan",           "next": "hot_action" },
+        { "field": "message", "operator": "contains", "value": "donde estan",           "next": "hot_action" }
+      ],
+      "default_next": "cg_note"
+    },
+
+    {
+      "id": "cg_note",
+      "type": "action",
+      "actions": [
+        { "type": "add_note", "text": "Bot - Consulta general. Descripcion: {descripcion_consulta}." }
+      ],
+      "next": "cg_stage"
+    },
+
+    {
+      "id": "cg_stage",
+      "type": "action",
+      "actions": [
+        { "type": "move_to_pipeline_stage", "pipeline": "VENTAS", "stage": "Calificando" }
+      ],
+      "next": "cg_close"
+    },
+
+    {
+      "id": "cg_close",
+      "type": "message",
+      "text": "Gracias por escribirnos. Un asesor de GreatPhones te responde pronto."
+    },
+
+    {
+      "id": "hot_action",
+      "type": "action",
+      "actions": [
+        { "type": "add_tag",                "value": "lead_caliente"  },
+        { "type": "add_tag",                "value": "prioridad_alta" },
+        { "type": "add_note",               "text": "Bot - LEAD CALIENTE. Categoria: {categoria}. Modelo: {modelo_buscado}. Frase de alta intencion detectada." },
+        { "type": "move_to_pipeline_stage", "pipeline": "VENTAS", "stage": "Interesado" }
+      ],
+      "next": "hot_close"
+    },
+
+    {
+      "id": "hot_close",
+      "type": "message",
+      "text": "Perfecto, ya tenemos todo anotado. Un asesor de GreatPhones se comunica con vos enseguida."
+    }
+
+  ]
+}
