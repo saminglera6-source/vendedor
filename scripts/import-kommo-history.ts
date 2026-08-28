@@ -1,25 +1,30 @@
 /**
  * Importación del historial de conversaciones de Kommo a knowledge_chunks (RAG).
  *
- * Descarga los mensajes de chat (entrantes + salientes) registrados en Kommo
- * vía /api/v4/events, los agrupa por lead en hilos cronológicos, genera
- * embeddings y los inserta en knowledge_chunks. Así el agente aprende el
- * estilo real de respuesta del vendedor.
+ * Recorre todas las conversaciones (talks) de la cuenta, baja el transcript
+ * completo de cada una vía /api/v4/talks/{id}/messages, las agrupa en hilos
+ * cronológicos, genera embeddings y los inserta en knowledge_chunks. Así el
+ * agente aprende el estilo real de respuesta del vendedor.
  *
  * Uso:
  *   npm run import-kommo-history
- *   node --env-file .env --import tsx/esm scripts/import-kommo-history.ts
+ *   npm run import-kommo-history -- --dry-run --max-talks=5
  *
  * Requiere en .env:
- *   KOMMO_SUBDOMAIN, KOMMO_ACCESS_TOKEN (long-lived token)
+ *   KOMMO_SUBDOMAIN, KOMMO_ACCESS_TOKEN (long-lived token con scope crm)
  *   OPENAI_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY
  *
  * Flags:
- *   --max-pages=N   límite de páginas de eventos a descargar (default: sin límite)
- *   --dry-run       descarga y arma los hilos pero no genera embeddings ni inserta
+ *   --dry-run          baja y arma los hilos, muestra un ejemplo, no inserta
+ *   --max-talks=N      límite de conversaciones a procesar
+ *   --origin=waba      solo un canal (waba | instagram_business | telegram | …)
  */
 
-import { getChatEventsPage, type KommoChatEvent } from '../src/integrations/kommo/client.js';
+import {
+  listTalksPage,
+  getTalkMessages,
+  type KommoChatMessage,
+} from '../src/integrations/kommo/client.js';
 import { embedBatch } from '../src/rag/embed.js';
 import { chunkConversation } from '../src/rag/chunker.js';
 import { db, toVectorString } from '../src/db/client.js';
@@ -27,85 +32,61 @@ import type { KnowledgeChunkInsert } from '../src/db/schema.js';
 import type { KnowledgeChunkMetadata } from '../src/types.js';
 
 // ---------------------------------------------------------------------------
-// Config / flags
+// Flags
 // ---------------------------------------------------------------------------
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
-const MAX_PAGES = (() => {
-  const flag = args.find((a) => a.startsWith('--max-pages='));
-  return flag ? parseInt(flag.split('=')[1] ?? '0', 10) : Infinity;
-})();
+const MAX_TALKS = numFlag('--max-talks=', Infinity);
+const ORIGIN_FILTER = strFlag('--origin=');
 
-const EVENTS_PER_PAGE = 100;
+function numFlag(prefix: string, def: number): number {
+  const f = args.find((a) => a.startsWith(prefix));
+  return f ? parseInt(f.slice(prefix.length), 10) : def;
+}
+function strFlag(prefix: string): string | undefined {
+  const f = args.find((a) => a.startsWith(prefix));
+  return f ? f.slice(prefix.length) : undefined;
+}
+
 const EMBED_BATCH_SIZE = 50;
 const CHUNK_MAX_CHARS = 2_000;
 const CHUNK_OVERLAP_CHARS = 200;
 const MIN_MESSAGES_PER_THREAD = 3;
+const REQUEST_DELAY_MS = 120; // respeta rate limit de Kommo (~7 req/s)
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 // ---------------------------------------------------------------------------
-// 1. Descargar todos los eventos de chat
+// 1. Listar todas las talks
 // ---------------------------------------------------------------------------
 
-async function downloadAllEvents(): Promise<KommoChatEvent[]> {
-  const all: KommoChatEvent[] = [];
+interface TalkRef { talkId: number; leadId: number | null; origin: string; }
+
+async function listAllTalks(): Promise<TalkRef[]> {
+  const all: TalkRef[] = [];
   let page = 1;
 
-  while (page <= MAX_PAGES) {
-    const result = await getChatEventsPage(page, EVENTS_PER_PAGE);
+  while (true) {
+    const result = await listTalksPage(page, 250);
     if (!result.ok) {
       if (page === 1) throw new Error(`Kommo API: ${result.error.message}`);
-      console.warn(`  ⚠  Página ${page} falló (${result.error.message}) — corto acá`);
+      console.warn(`  ⚠  Página ${page} falló — corto acá`);
       break;
     }
-
-    const { events, hasNext } = result.value;
-    all.push(...events);
-    process.stdout.write(`\r  📥 Página ${page} · ${all.length} mensajes acumulados`);
-
-    if (!hasNext || events.length === 0) break;
+    const { talks, hasNext } = result.value;
+    all.push(...talks);
+    process.stdout.write(`\r  📋 ${all.length} conversaciones listadas`);
+    if (!hasNext || talks.length === 0) break;
     page++;
+    await sleep(REQUEST_DELAY_MS);
   }
-
   process.stdout.write('\n');
   return all;
 }
 
 // ---------------------------------------------------------------------------
-// 2. Agrupar en hilos por lead
-// ---------------------------------------------------------------------------
-
-interface Thread {
-  leadId: number;
-  messages: Array<{ sender: string; content: string; timestampMs: number }>;
-}
-
-function groupIntoThreads(events: KommoChatEvent[]): Thread[] {
-  const byLead = new Map<number, KommoChatEvent[]>();
-  for (const ev of events) {
-    const list = byLead.get(ev.leadId) ?? [];
-    list.push(ev);
-    byLead.set(ev.leadId, list);
-  }
-
-  const threads: Thread[] = [];
-  for (const [leadId, evs] of byLead) {
-    const messages = evs
-      .sort((a, b) => a.createdAt - b.createdAt)
-      .map((e) => ({
-        sender: e.direction === 'incoming' ? 'Cliente' : 'Vendedor',
-        content: e.text,
-        timestampMs: e.createdAt * 1000,
-      }));
-    if (messages.length >= MIN_MESSAGES_PER_THREAD) {
-      threads.push({ leadId, messages });
-    }
-  }
-  return threads;
-}
-
-// ---------------------------------------------------------------------------
-// 3. Metadatos por hilo (mismo criterio que import-history.ts)
+// 2. Metadatos por hilo
 // ---------------------------------------------------------------------------
 
 const MODEL_PATTERNS = [
@@ -117,10 +98,9 @@ const MODEL_PATTERNS = [
   'iphone 12 pro max', 'iphone 12 pro', 'iphone 12',
   'iphone 11 pro max', 'iphone 11',
 ];
-
 const SOLD_KEYWORDS = [
   'transferencia', 'comprobante', 'alias', 'cbu', 'cvu', 'ya te mando',
-  'queda reservado', 'lo retirás', 'lo retiras', 'cerrado', 'lo cerramos',
+  'queda reservado', 'lo retirás', 'lo retiras', 'lo cerramos', 'seña',
 ];
 const LOST_KEYWORDS = [
   'no me interesa', 'ya lo compré', 'ya lo compre', 'compré en otro lado',
@@ -134,8 +114,8 @@ const OBJECTION_PATTERNS: Array<{ keywords: string[]; label: string }> = [
   { keywords: ['batería', 'bateria'], label: 'bateria' },
 ];
 
-function buildMetadata(messages: Thread['messages']): KnowledgeChunkMetadata {
-  const text = messages.map((m) => m.content.toLowerCase()).join(' ');
+function buildMetadata(messages: KommoChatMessage[], origin: string): KnowledgeChunkMetadata {
+  const text = messages.map((m) => m.text.toLowerCase()).join(' ');
   const modelo = MODEL_PATTERNS.find((p) => text.includes(p));
   const resultado = SOLD_KEYWORDS.some((k) => text.includes(k))
     ? 'vendido'
@@ -150,6 +130,7 @@ function buildMetadata(messages: Thread['messages']): KnowledgeChunkMetadata {
     ...(objecion && { objecion_resuelta: objecion }),
     tags: [
       'kommo',
+      origin,
       ...(resultado ? [resultado] : []),
       ...(modelo ? [modelo.replace('iphone ', 'iphone-')] : []),
     ],
@@ -157,31 +138,25 @@ function buildMetadata(messages: Thread['messages']): KnowledgeChunkMetadata {
 }
 
 // ---------------------------------------------------------------------------
-// 4. Chunk + embed + insert
+// 3. Chunk + embed + insert
 // ---------------------------------------------------------------------------
 
-interface ChunkToInsert {
-  insert: KnowledgeChunkInsert;
-  contentForEmbed: string;
-}
+interface ChunkToInsert { insert: KnowledgeChunkInsert; contentForEmbed: string; }
 
 async function flushBatch(batch: ChunkToInsert[]): Promise<number> {
   if (batch.length === 0) return 0;
-
   const embedResult = await embedBatch(batch.map((b) => b.contentForEmbed));
   if (!embedResult.ok) {
-    console.error(`  ✗ embedBatch: ${embedResult.error.message}`);
+    console.error(`\n  ✗ embedBatch: ${embedResult.error.message}`);
     return 0;
   }
-
   const inserts: KnowledgeChunkInsert[] = batch.map((b, i) => ({
     ...b.insert,
     embedding: toVectorString(embedResult.value[i]!),
   }));
-
   const { error } = await db.from('knowledge_chunks').insert(inserts as never);
   if (error) {
-    console.error(`  ✗ insert: ${error.message}`);
+    console.error(`\n  ✗ insert: ${error.message}`);
     return 0;
   }
   return inserts.length;
@@ -192,40 +167,52 @@ async function flushBatch(batch: ChunkToInsert[]): Promise<number> {
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
-  console.log('🔗 Descargando historial de Kommo…');
-  const events = await downloadAllEvents();
-  console.log(`   ${events.length} mensajes de chat descargados`);
+  console.log('🔗 Listando conversaciones de Kommo…');
+  let talks = await listAllTalks();
 
-  const threads = groupIntoThreads(events);
-  console.log(`   ${threads.length} hilos con ≥${MIN_MESSAGES_PER_THREAD} mensajes`);
+  if (ORIGIN_FILTER) talks = talks.filter((t) => t.origin === ORIGIN_FILTER);
+  if (Number.isFinite(MAX_TALKS)) talks = talks.slice(0, MAX_TALKS);
 
-  if (threads.length === 0) {
-    console.warn('   Nada para importar. ¿El token tiene scope de eventos? ¿Hay chats en la cuenta?');
-    return;
-  }
-
-  if (DRY_RUN) {
-    const sample = threads[0]!;
-    console.log('\n— DRY RUN — ejemplo de hilo:');
-    console.log(chunkConversation(sample.messages, { maxChars: CHUNK_MAX_CHARS }).at(0)?.content.slice(0, 800));
-    console.log(`\n   (${threads.length} hilos listos para importar; corré sin --dry-run)`);
-    return;
-  }
+  const byOrigin = talks.reduce<Record<string, number>>((acc, t) => {
+    acc[t.origin] = (acc[t.origin] ?? 0) + 1;
+    return acc;
+  }, {});
+  console.log(`   ${talks.length} conversaciones a procesar · por canal:`, byOrigin);
 
   let totalChunks = 0;
   let totalInserted = 0;
+  let importedThreads = 0;
+  let firstSample = '';
   const batch: ChunkToInsert[] = [];
 
-  for (let t = 0; t < threads.length; t++) {
-    const thread = threads[t]!;
-    const metadata = buildMetadata(thread.messages);
-    const firstDate = new Date(thread.messages[0]!.timestampMs).toISOString().slice(0, 10);
-    const sourceId = `kommo_lead_${thread.leadId}`;
+  for (let i = 0; i < talks.length; i++) {
+    const talk = talks[i]!;
+    const msgResult = await getTalkMessages(talk.talkId);
+    await sleep(REQUEST_DELAY_MS);
 
-    const chunks = chunkConversation(thread.messages, {
+    if (!msgResult.ok) {
+      console.warn(`\n  ⚠  talk ${talk.talkId}: ${msgResult.error.message}`);
+      continue;
+    }
+    const messages = msgResult.value;
+    if (messages.length < MIN_MESSAGES_PER_THREAD) continue;
+
+    const metadata = buildMetadata(messages, talk.origin);
+    const firstDate = new Date((messages[0]!.createdAt || 0) * 1000).toISOString().slice(0, 10);
+    const sourceId = `kommo_talk_${talk.talkId}`;
+
+    const convForChunker = messages.map((m) => ({
+      sender: m.direction === 'incoming' ? 'Cliente' : 'Vendedor',
+      content: m.text,
+      timestampMs: m.createdAt * 1000,
+    }));
+    const chunks = chunkConversation(convForChunker, {
       maxChars: CHUNK_MAX_CHARS,
       overlapChars: CHUNK_OVERLAP_CHARS,
     });
+
+    if (!firstSample && chunks[0]) firstSample = chunks[0].content;
+    importedThreads++;
 
     for (const chunk of chunks) {
       batch.push({
@@ -239,23 +226,31 @@ async function main(): Promise<void> {
       });
       totalChunks++;
 
-      if (batch.length >= EMBED_BATCH_SIZE) {
+      if (!DRY_RUN && batch.length >= EMBED_BATCH_SIZE) {
         totalInserted += await flushBatch(batch.splice(0, EMBED_BATCH_SIZE));
-        process.stdout.write(`\r  ↑ ${totalInserted}/${totalChunks} chunks insertados`);
       }
     }
+
+    process.stdout.write(`\r  ⚙  ${i + 1}/${talks.length} talks · ${importedThreads} hilos · ${totalChunks} chunks`);
   }
 
-  if (batch.length > 0) totalInserted += await flushBatch(batch);
+  if (!DRY_RUN && batch.length > 0) totalInserted += await flushBatch(batch);
   process.stdout.write('\n');
 
+  if (DRY_RUN) {
+    console.log('\n— DRY RUN — ejemplo de hilo formateado:\n');
+    console.log(firstSample.slice(0, 1200));
+    console.log(`\n   ${importedThreads} hilos · ${totalChunks} chunks listos. Corré sin --dry-run para importar.`);
+    return;
+  }
+
   console.log('\n✅ Importación de Kommo completa:');
-  console.log(`   Hilos:             ${threads.length}`);
+  console.log(`   Hilos importados:  ${importedThreads}`);
   console.log(`   Chunks generados:  ${totalChunks}`);
   console.log(`   Chunks insertados: ${totalInserted}`);
 }
 
 main().catch((err) => {
-  console.error('✗ Error fatal:', err);
+  console.error('\n✗ Error fatal:', err);
   process.exit(1);
 });

@@ -344,95 +344,103 @@ export async function kommoGet<T = unknown>(path: string): Promise<Result<T>> {
   return kommoFetch<T>(path, { method: 'GET' });
 }
 
-export interface KommoChatEvent {
-  /** ID del lead al que pertenece el mensaje */
-  leadId: number;
+export interface KommoTalkRef {
+  talkId: number;
+  /** Lead asociado a la conversación */
+  leadId: number | null;
+  /** Canal: instagram_business, waba, telegram, etc. */
+  origin: string;
+}
+
+export interface KommoChatMessage {
   /** 'incoming' = mensaje del cliente · 'outgoing' = respuesta nuestra */
   direction: 'incoming' | 'outgoing';
-  /** Texto del mensaje */
+  /** Texto del mensaje (vacío para adjuntos sin texto) */
   text: string;
   /** Unix timestamp en segundos */
   createdAt: number;
 }
 
-interface KommoEventsResponse {
-  _embedded?: { events?: Array<Record<string, unknown>> };
+interface TalksResponse {
+  _embedded?: { talks?: Array<Record<string, unknown>> };
   _links?: { next?: { href?: string } };
 }
 
-/** Busca recursivamente el primer valor string de una clave dada dentro de un objeto/array. */
-function deepFindString(node: unknown, key: string): string | undefined {
-  if (!node || typeof node !== 'object') return undefined;
-  if (Array.isArray(node)) {
-    for (const item of node) {
-      const found = deepFindString(item, key);
-      if (found) return found;
-    }
-    return undefined;
-  }
-  const obj = node as Record<string, unknown>;
-  if (typeof obj[key] === 'string' && (obj[key] as string).trim()) {
-    return obj[key] as string;
-  }
-  for (const v of Object.values(obj)) {
-    const found = deepFindString(v, key);
-    if (found) return found;
-  }
-  return undefined;
+interface TalkMessagesResponse {
+  _embedded?: { messages?: Array<Record<string, unknown>> };
+  _links?: { next?: { href?: string } };
 }
 
 /**
- * Descarga una página de eventos de mensajes de chat (entrantes y salientes)
- * asociados a leads. Reconstruible en hilos por leadId + createdAt.
+ * Descarga una página de conversaciones (talks) de la cuenta.
  *
  * @param page  - número de página (1-based)
- * @param limit - eventos por página (máx 100 en Kommo)
+ * @param limit - talks por página (máx 250)
  */
-export async function getChatEventsPage(
+export async function listTalksPage(
   page: number,
-  limit = 100,
-): Promise<Result<{ events: KommoChatEvent[]; hasNext: boolean }>> {
-  const params = new URLSearchParams({
-    page: String(page),
-    limit: String(limit),
-  });
-  // Kommo espera filter[type][]=... repetido
-  params.append('filter[type][]', 'incoming_chat_message');
-  params.append('filter[type][]', 'outgoing_chat_message');
-  params.append('filter[entity]', 'lead');
-
-  const result = await kommoFetch<KommoEventsResponse>(
-    `/api/v4/events?${params.toString()}`,
+  limit = 250,
+): Promise<Result<{ talks: KommoTalkRef[]; hasNext: boolean }>> {
+  const result = await kommoFetch<TalksResponse>(
+    `/api/v4/talks?page=${page}&limit=${limit}`,
     { method: 'GET' },
   );
   if (!result.ok) return result;
+  if (!result.value) return { ok: true, value: { talks: [], hasNext: false } };
 
-  const rawEvents = result.value._embedded?.events ?? [];
-  const events: KommoChatEvent[] = [];
+  const raw = result.value._embedded?.talks ?? [];
+  const talks: KommoTalkRef[] = raw.map((t) => {
+    const entityType = typeof t['entity_type'] === 'string' ? t['entity_type'] : '';
+    const entityId = Number(t['entity_id']);
+    return {
+      talkId: Number(t['talk_id']),
+      leadId: entityType === 'lead' && Number.isFinite(entityId) ? entityId : null,
+      origin: typeof t['origin'] === 'string' ? t['origin'] : 'unknown',
+    };
+  }).filter((t) => Number.isFinite(t.talkId));
 
-  for (const ev of rawEvents) {
-    const type = typeof ev['type'] === 'string' ? ev['type'] : '';
-    const entityType = typeof ev['entity_type'] === 'string' ? ev['entity_type'] : '';
-    const entityId = Number(ev['entity_id']);
-    const createdAt = Number(ev['created_at']);
-    if (entityType !== 'lead' || !Number.isFinite(entityId)) continue;
+  const hasNext = Boolean(result.value._links?.next?.href) || raw.length === limit;
+  return { ok: true, value: { talks, hasNext } };
+}
 
-    const text =
-      deepFindString(ev['value_after'], 'text') ??
-      deepFindString(ev['value_after'], 'message') ??
-      '';
-    if (!text.trim()) continue;
+/**
+ * Descarga todos los mensajes de una conversación (talk), paginando internamente.
+ * Devuelve los mensajes de texto en orden cronológico ascendente.
+ */
+export async function getTalkMessages(
+  talkId: number,
+  maxPages = 20,
+): Promise<Result<KommoChatMessage[]>> {
+  const out: KommoChatMessage[] = [];
 
-    events.push({
-      leadId: entityId,
-      direction: type.startsWith('incoming') ? 'incoming' : 'outgoing',
-      text: text.trim(),
-      createdAt: Number.isFinite(createdAt) ? createdAt : 0,
-    });
+  for (let page = 1; page <= maxPages; page++) {
+    const result = await kommoFetch<TalkMessagesResponse>(
+      `/api/v4/talks/${talkId}/messages?page=${page}&limit=250`,
+      { method: 'GET' },
+    );
+    if (!result.ok) return result;
+    if (!result.value) break;
+
+    const raw = result.value._embedded?.messages ?? [];
+    for (const m of raw) {
+      const messageType = typeof m['message_type'] === 'string' ? m['message_type'] : '';
+      const text = typeof m['text'] === 'string' ? m['text'].trim() : '';
+      if (messageType !== 'text' || !text) continue;
+
+      const type = typeof m['type'] === 'string' ? m['type'] : '';
+      const createdAt = Number(m['created_at']);
+      out.push({
+        direction: type === 'outgoing' ? 'outgoing' : 'incoming',
+        text,
+        createdAt: Number.isFinite(createdAt) ? createdAt : 0,
+      });
+    }
+
+    if (!result.value._links?.next?.href && raw.length < 250) break;
   }
 
-  const hasNext = Boolean(result.value._links?.next?.href) || rawEvents.length === limit;
-  return { ok: true, value: { events, hasNext } };
+  out.sort((a, b) => a.createdAt - b.createdAt);
+  return { ok: true, value: out };
 }
 
 // ===========================================================================
