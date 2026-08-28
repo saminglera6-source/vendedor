@@ -336,6 +336,106 @@ export async function createTask(
 }
 
 // ===========================================================================
+// Historial de conversaciones — para importación RAG
+// ===========================================================================
+
+/** GET genérico a la API de Kommo. Expuesto para scripts de importación / debug. */
+export async function kommoGet<T = unknown>(path: string): Promise<Result<T>> {
+  return kommoFetch<T>(path, { method: 'GET' });
+}
+
+export interface KommoChatEvent {
+  /** ID del lead al que pertenece el mensaje */
+  leadId: number;
+  /** 'incoming' = mensaje del cliente · 'outgoing' = respuesta nuestra */
+  direction: 'incoming' | 'outgoing';
+  /** Texto del mensaje */
+  text: string;
+  /** Unix timestamp en segundos */
+  createdAt: number;
+}
+
+interface KommoEventsResponse {
+  _embedded?: { events?: Array<Record<string, unknown>> };
+  _links?: { next?: { href?: string } };
+}
+
+/** Busca recursivamente el primer valor string de una clave dada dentro de un objeto/array. */
+function deepFindString(node: unknown, key: string): string | undefined {
+  if (!node || typeof node !== 'object') return undefined;
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = deepFindString(item, key);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  const obj = node as Record<string, unknown>;
+  if (typeof obj[key] === 'string' && (obj[key] as string).trim()) {
+    return obj[key] as string;
+  }
+  for (const v of Object.values(obj)) {
+    const found = deepFindString(v, key);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/**
+ * Descarga una página de eventos de mensajes de chat (entrantes y salientes)
+ * asociados a leads. Reconstruible en hilos por leadId + createdAt.
+ *
+ * @param page  - número de página (1-based)
+ * @param limit - eventos por página (máx 100 en Kommo)
+ */
+export async function getChatEventsPage(
+  page: number,
+  limit = 100,
+): Promise<Result<{ events: KommoChatEvent[]; hasNext: boolean }>> {
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+  // Kommo espera filter[type][]=... repetido
+  params.append('filter[type][]', 'incoming_chat_message');
+  params.append('filter[type][]', 'outgoing_chat_message');
+  params.append('filter[entity]', 'lead');
+
+  const result = await kommoFetch<KommoEventsResponse>(
+    `/api/v4/events?${params.toString()}`,
+    { method: 'GET' },
+  );
+  if (!result.ok) return result;
+
+  const rawEvents = result.value._embedded?.events ?? [];
+  const events: KommoChatEvent[] = [];
+
+  for (const ev of rawEvents) {
+    const type = typeof ev['type'] === 'string' ? ev['type'] : '';
+    const entityType = typeof ev['entity_type'] === 'string' ? ev['entity_type'] : '';
+    const entityId = Number(ev['entity_id']);
+    const createdAt = Number(ev['created_at']);
+    if (entityType !== 'lead' || !Number.isFinite(entityId)) continue;
+
+    const text =
+      deepFindString(ev['value_after'], 'text') ??
+      deepFindString(ev['value_after'], 'message') ??
+      '';
+    if (!text.trim()) continue;
+
+    events.push({
+      leadId: entityId,
+      direction: type.startsWith('incoming') ? 'incoming' : 'outgoing',
+      text: text.trim(),
+      createdAt: Number.isFinite(createdAt) ? createdAt : 0,
+    });
+  }
+
+  const hasNext = Boolean(result.value._links?.next?.href) || rawEvents.length === limit;
+  return { ok: true, value: { events, hasNext } };
+}
+
+// ===========================================================================
 // Helpers para campos personalizados
 // ===========================================================================
 

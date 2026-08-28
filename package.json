@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
-    "import-history": "tsx scripts/import-history.ts"
+    "import-history": "tsx scripts/import-history.ts",
+    "import-kommo-history": "node --env-file .env --import tsx/esm scripts/import-kommo-history.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",
