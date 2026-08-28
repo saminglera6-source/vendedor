@@ -45,6 +45,12 @@ export const AgentResponseSchema = z
       .min(1, 'respuesta no puede estar vacía')
       .max(2000, 'respuesta demasiado larga para WhatsApp'),
 
+    fragmentos: z
+      .array(z.string().min(1).max(700))
+      .min(2, 'fragmentos debe tener al menos 2 elementos si no es null')
+      .max(3, 'fragmentos no puede tener más de 3 elementos')
+      .nullable(),
+
     lead_score: z
       .number()
       .min(0)

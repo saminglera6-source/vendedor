@@ -36,6 +36,7 @@ export interface GuardResult {
  * Son violaciones semánticas graves que comprometen la credibilidad del agente.
  */
 const HARDCODED_VIOLATIONS: readonly string[] = [
+  // IA / bot identity
   'como ia',
   'como modelo de lenguaje',
   'soy un bot',
@@ -43,19 +44,53 @@ const HARDCODED_VIOLATIONS: readonly string[] = [
   'inteligencia artificial',
   'no tengo acceso',
   'no puedo verificar',
-  // Frases de inventado de datos — críticas para la integridad comercial
+  // Datos inventados — crítico para integridad comercial
   'debería costar',
   'aproximadamente vale',
   'creo que sale',
   'supongo que',
   'no estoy seguro del precio',
-  // Identidad institucional — el agente representa a GreatPhones, nunca a una persona
+  // Identidad personal (el agente representa a GreatPhones, nunca a una persona)
   'yo lo vendo',
   'yo hago envios',
   'yo te aviso',
   'te paso con sam',
   'te paso con martin',
   'te paso con el dueno',
+  // Stock / origen de mercadería
+  'lo puedo conseguir',
+  // Escalación visible al cliente — la escalación es siempre interna, nunca mencionada al cliente
+  'ya te paso con alguien',
+  'te paso con alguien',
+  'un asesor de greatphones',
+  'le paso con un asesor',
+  'lo voy a derivar',
+  'voy a derivar',
+  'derivamos la consulta',
+  'nuestro equipo se contactara',
+  'un representante',
+  'voy a escalar',
+  'vamos a revisar tu caso',
+  'te confirmo con un asesor',
+  'departamento de',
+  'sector de',
+  'area de',
+  // Frases de call center / bot
+  'estoy aca para ayudarte',
+  'puedo ayudarte a cerrarlo',
+  'le informamos',
+  'estimado cliente',
+  // Garantía — NUNCA confirmar cobertura por chat antes de revisar el equipo en el local
+  'esta dentro de la garantia',
+  'entra en garantia',
+  'cubre la garantia',
+  'lo cubre la garantia',
+  'si te cubre',
+  'esta cubierto',
+  'queda cubierto',
+  'aplica la garantia',
+  'entra en la garantia',
+  'corresponde la garantia',
 ] as const;
 
 // ===========================================================================

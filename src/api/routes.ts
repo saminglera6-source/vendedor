@@ -218,7 +218,12 @@ async function handleMessage(req: IncomingMessage, res: ServerResponse): Promise
     return;
   }
 
-  sendOk(res, 200, result.value);
+  // Delay humanizador: entre 5 y 60 segundos.
+  // El cliente (Kommo) lee este valor y espera antes de enviar el mensaje.
+  // La respuesta HTTP se devuelve inmediatamente — el delay lo aplica el cliente.
+  const delay_seconds = Math.floor(Math.random() * 56) + 5;
+
+  sendOk(res, 200, { ...result.value, delay_seconds });
 }
 
 /**

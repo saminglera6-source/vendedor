@@ -198,8 +198,15 @@ export interface FollowupSpec {
  * Siempre devuelta vía tool_use de Claude — nunca texto libre parseado.
  */
 export interface AgentResponse {
-  /** Mensaje final para enviar al cliente */
+  /** Mensaje final para enviar al cliente (texto completo, usado para logging y clientes legacy) */
   respuesta: string;
+  /**
+   * Fragmentos individuales para enviar como mensajes separados en WhatsApp.
+   * null → enviar `respuesta` como un único mensaje.
+   * Array de 2-3 strings → enviar cada elemento como mensaje separado con delay entre ellos.
+   * Si no es null, respuesta === fragmentos.join('\n\n').
+   */
+  fragmentos: string[] | null;
   /** Score 0–100 del lead después de procesar este mensaje */
   lead_score: number;
   /** Nuevo estado calculado para el lead */

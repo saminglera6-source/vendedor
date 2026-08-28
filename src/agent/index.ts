@@ -37,6 +37,10 @@ import { buildPrompt, RESPONDER_CLIENTE_TOOL } from './prompt.js';
 import { parseAgentResponse } from './parser.js';
 import { checkLanguage, formatViolationSummary } from './language-guard.js';
 
+// — RAG layer —
+import { embed } from '../rag/embed.js';
+import { searchSimilar } from '../rag/search.js';
+
 // ===========================================================================
 // Tipos públicos
 // ===========================================================================
@@ -188,8 +192,21 @@ export async function processMessage(
   const historyResult = await getHistoryForPrompt(lead.id, 20);
   const history = historyResult.ok ? historyResult.value : [];
 
-  // ─── Paso 5: RAG — stub (implementar en Etapa 4) ─────────────────────────
-  const ragChunks: AgentContext['ragChunks'] = [];
+  // ─── Paso 5: RAG — embed + búsqueda vectorial ────────────────────────────
+  // Fallo no bloquea: si OPENAI_API_KEY no está o la búsqueda falla, continúa con []
+  let ragChunks: AgentContext['ragChunks'] = [];
+  if (process.env.OPENAI_API_KEY) {
+    const embeddingResult = await embed(message);
+    if (embeddingResult.ok) {
+      const ragTopK = rules.rag_top_k.value ?? 5;
+      const ragThreshold = rules.rag_top_k.threshold ?? 0.75;
+      const searchResult = await searchSimilar(embeddingResult.value, {
+        topK: ragTopK,
+        threshold: ragThreshold,
+      });
+      if (searchResult.ok) ragChunks = searchResult.value;
+    }
+  }
 
   // ─── Paso 6: Product matching ────────────────────────────────────────────
   const matchResult = await matchFromMessage(message, memory);

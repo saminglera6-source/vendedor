@@ -326,6 +326,33 @@ function parseKommoJsonFormat(
 }
 
 // ===========================================================================
+// Helpers de timing
+// ===========================================================================
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Calcula el delay inicial antes de enviar el primer mensaje.
+ * Heurística basada en longitud: textos cortos → delay corto (saludo),
+ * textos largos → delay largo (presupuesto, canje, financiación).
+ */
+function computeInitialDelay(respuesta: string): number {
+  const len = respuesta.length;
+  if (len < 50) {
+    // Saludo o respuesta muy corta: 5–15 segundos
+    return (5 + Math.random() * 10) * 1000;
+  }
+  if (len < 150) {
+    // Consulta normal: 10–25 segundos
+    return (10 + Math.random() * 15) * 1000;
+  }
+  // Presupuesto, canje, financiación (respuesta larga): 15–45 segundos
+  return (15 + Math.random() * 30) * 1000;
+}
+
+// ===========================================================================
 // Handler principal
 // ===========================================================================
 
@@ -396,16 +423,32 @@ export async function handleKommoMessage(
   }
 
   const { respuesta, agentResponse, escalated } = processResult.value;
+  const fragmentos = agentResponse.fragmentos;
 
-  // ── 6–7. Guardar respuesta en IA_RESPUESTA y lanzar Salesbot ────────────
+  // ── 6–7. Delay humano + fragmentación + Salesbot ─────────────────────────
   if (conversation.lead_id) {
     const fieldId = Number(process.env['KOMMO_FIELD_IA_RESPUESTA'] ?? '0');
     if (fieldId > 0) {
-      const fieldResult = await updateLeadCustomField(conversation.lead_id, fieldId, respuesta);
-      if (!fieldResult.ok) console.error('[kommo] updateLeadCustomField falló:', fieldResult.error.message);
+      const parts = fragmentos ?? [respuesta];
+      const initialDelaySec = Math.round(computeInitialDelay(respuesta) / 1000);
+
+      console.info(`[FRAGMENTED] lead=${conversation.lead_id} parts=${parts.length} initial_delay=${initialDelaySec}`);
+      await sleep(initialDelaySec * 1000);
+
+      for (let i = 0; i < parts.length; i++) {
+        if (i > 0) {
+          const interDelay = Math.round(2000 + Math.random() * 2000);
+          await sleep(interDelay);
+        }
+        console.info(`[FRAGMENT] lead=${conversation.lead_id} part=${i + 1}/${parts.length}`);
+        const fieldResult = await updateLeadCustomField(conversation.lead_id, fieldId, parts[i]!);
+        if (!fieldResult.ok) console.error('[kommo] updateLeadCustomField falló:', fieldResult.error.message);
+        const botResult = await launchSalesbot(conversation.lead_id);
+        if (!botResult.ok) console.error('[kommo] launchSalesbot falló:', botResult.error.message);
+      }
+    } else {
+      console.warn('[kommo] KOMMO_FIELD_IA_RESPUESTA no configurado — no se puede enviar respuesta');
     }
-    const botResult = await launchSalesbot(conversation.lead_id);
-    if (!botResult.ok) console.error('[kommo] launchSalesbot falló:', botResult.error.message);
   } else {
     console.warn('[kommo] Sin lead_id — no se puede lanzar Salesbot');
   }

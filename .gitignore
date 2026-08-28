@@ -3,3 +3,10 @@ node_modules/
 tsc_output.txt
 *.js.map
 dist/
+
+# Datos privados de clientes / exports crudos — NO publicar
+_chat_analysis/
+instagram-*.zip
+INSTAGRAM_ANALYSIS.json
+vmlogs/
+.claude/settings.local.json

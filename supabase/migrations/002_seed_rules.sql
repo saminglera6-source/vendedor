@@ -34,19 +34,19 @@ INSERT INTO business_rules (key, value, description) VALUES
 (
   'business_hours',
   '{
-    "timezone": "America/Buenos_Aires",
+    "timezone": "America/Argentina/Buenos_Aires",
     "schedule": {
-      "mon": { "open": "09:00", "close": "18:00" },
-      "tue": { "open": "09:00", "close": "18:00" },
-      "wed": { "open": "09:00", "close": "18:00" },
-      "thu": { "open": "09:00", "close": "18:00" },
-      "fri": { "open": "09:00", "close": "18:00" },
-      "sat": { "open": "10:00", "close": "14:00" },
+      "mon": { "open": "10:00", "close": "20:00" },
+      "tue": { "open": "10:00", "close": "20:00" },
+      "wed": { "open": "10:00", "close": "20:00" },
+      "thu": { "open": "10:00", "close": "20:00" },
+      "fri": { "open": "10:00", "close": "20:00" },
+      "sat": { "open": "10:00", "close": "20:00" },
       "sun": null
     },
-    "outside_hours_msg": "¡Hola! Por el momento estamos fuera de horario. Te respondemos a primera hora. ¿En qué puedo ayudarte?"
+    "outside_hours_msg": "Por ahora estamos cerrados. Atendemos de lunes a sábado de 10 a 20. Apenas abramos te respondemos!"
   }'::jsonb,
-  'Horario de atención por día. null = cerrado. Timezone: America/Buenos_Aires.'
+  'Horario de atención por día. null = cerrado. Timezone: America/Argentina/Buenos_Aires.'
 ),
 
 -- ----------------------------------------------------------
@@ -56,10 +56,10 @@ INSERT INTO business_rules (key, value, description) VALUES
 (
   'followup_messages',
   '{
-    "recuperacion": "Hola {nombre}! Te escribo porque hace unos días consultaste por el {producto}. ¿Seguís buscando? Lo tengo disponible y puedo ayudarte a cerrarlo hoy.",
-    "cierre":       "Hola {nombre}! ¿Pudiste decidirte con el {producto}? Está disponible, puedo reservarlo para vos ahora.",
-    "check_in":     "Hola {nombre}! ¿Cómo andás? ¿Seguís evaluando opciones? Estoy acá para ayudarte.",
-    "oferta":       "Hola {nombre}! Te escribo porque tenemos disponibilidad del {producto} que consultaste. ¿Lo cerramos?"
+    "recuperacion": "Hola! Te escribo porque tenemos disponibilidad del {producto} que consultaste. ¿Seguís buscando?",
+    "cierre":       "Como va! Quedó pendiente lo del {producto}. ¿Lo cerramos?",
+    "check_in":     "Como va {nombre}! ¿Qué onda con la búsqueda?",
+    "oferta":       "Hola! Acaba de entrar el {producto} y me acordé de vos. ¿Te cuento?"
   }'::jsonb,
   'Plantillas para mensajes de seguimiento automático. Variables: {nombre}, {producto}, {color}, {almacenamiento}.'
 ),
@@ -129,6 +129,7 @@ INSERT INTO business_rules (key, value, description) VALUES
     "lo consigo",
     "tengo que buscarlo",
     "tengo que preguntar",
+    "tengo que consultar",
     "no tengo stock",
     "sin stock",
     "se lo compro a un colega",
@@ -143,9 +144,13 @@ INSERT INTO business_rules (key, value, description) VALUES
     "aproximadamente vale",
     "creo que sale",
     "no tenemos disponible",
-    "está agotado"
+    "está agotado",
+    "¿hay algo más en lo que pueda ayudarte",
+    "permítame",
+    "a su consulta",
+    "en respuesta a su"
   ]'::jsonb,
-  'Frases que el agente nunca debe usar. Generan desconfianza y reducen conversiones.'
+  'Frases que el agente nunca debe usar. Generan desconfianza o suenan corporativas.'
 ),
 
 -- ----------------------------------------------------------
@@ -177,8 +182,16 @@ INSERT INTO business_rules (key, value, description) VALUES
 -- ----------------------------------------------------------
 (
   'financing_plans',
-  '[]'::jsonb,
-  'Planes de cuotas activos. Array vacío = no ofrecer financiación. El agente no menciona cuotas si está vacío.'
+  '[
+    { "name": "1 pago tarjeta",  "installments": 1,  "interest_rate": 7.00,   "min_amount": 0 },
+    { "name": "2 cuotas",        "installments": 2,  "interest_rate": 29.52,  "min_amount": 0 },
+    { "name": "3 cuotas",        "installments": 3,  "interest_rate": 32.47,  "min_amount": 0 },
+    { "name": "6 cuotas",        "installments": 6,  "interest_rate": 41.38,  "min_amount": 0 },
+    { "name": "9 cuotas",        "installments": 9,  "interest_rate": 53.49,  "min_amount": 0 },
+    { "name": "12 cuotas",       "installments": 12, "interest_rate": 121.67, "min_amount": 0 },
+    { "name": "18 cuotas",       "installments": 18, "interest_rate": 93.51,  "min_amount": 0 }
+  ]'::jsonb,
+  'Planes de cuotas con tarjeta de crédito. interest_rate = recargo porcentual total sobre el precio contado. El agente siempre informa el valor POR CUOTA (precio × (1 + rate/100) / installments).'
 ),
 
 -- ----------------------------------------------------------
