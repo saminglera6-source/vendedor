@@ -21,6 +21,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { z } from 'zod';
 
 import { processMessage } from '../agent/index.js';
+import { CHAT_SIM_HTML } from './chat-ui.js';
 import { createAiFeedback } from '../db/ai-feedback.js';
 import { getLeads } from '../db/leads.js';
 import type { LeadEstado } from '../types.js';
@@ -457,6 +458,9 @@ async function router(req: IncomingMessage, res: ServerResponse): Promise<void> 
     await handleLeads(req, res, url);
   } else if (method === 'GET' && pathname === '/health') {
     handleHealth(res);
+  } else if (method === 'GET' && (pathname === '/' || pathname === '/chat')) {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(CHAT_SIM_HTML);
   } else {
     sendError(res, 404, 'NOT_FOUND', `Ruta no encontrada: ${method} ${pathname}`);
   }
