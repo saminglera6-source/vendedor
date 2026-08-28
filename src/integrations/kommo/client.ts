@@ -426,6 +426,8 @@ export async function getTalkMessages(
       const messageType = typeof m['message_type'] === 'string' ? m['message_type'] : '';
       const text = typeof m['text'] === 'string' ? m['text'].trim() : '';
       if (messageType !== 'text' || !text) continue;
+      // Placeholder de Kommo para mensajes previos a conectar el canal
+      if (text.startsWith('This message contains media and was received')) continue;
 
       const type = typeof m['type'] === 'string' ? m['type'] : '';
       const createdAt = Number(m['created_at']);

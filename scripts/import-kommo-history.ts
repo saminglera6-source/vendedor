@@ -198,7 +198,6 @@ async function main(): Promise<void> {
     if (messages.length < MIN_MESSAGES_PER_THREAD) continue;
 
     const metadata = buildMetadata(messages, talk.origin);
-    const firstDate = new Date((messages[0]!.createdAt || 0) * 1000).toISOString().slice(0, 10);
     const sourceId = `kommo_talk_${talk.talkId}`;
 
     const convForChunker = messages.map((m) => ({
@@ -220,7 +219,7 @@ async function main(): Promise<void> {
         insert: {
           source_type: 'historical_conversation',
           source_id: sourceId,
-          content: `[${firstDate}] ${chunk.content}`,
+          content: chunk.content,
           metadata: metadata as Record<string, unknown>,
         },
       });
