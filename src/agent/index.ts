@@ -193,10 +193,11 @@ export async function processMessage(
   const history = historyResult.ok ? historyResult.value : [];
 
   // ─── Paso 5: RAG — embed + búsqueda vectorial ────────────────────────────
-  // Fallo no bloquea: si OPENAI_API_KEY no está o la búsqueda falla, continúa con []
+  // Embeddings locales (Transformers.js) — sin API key. Fallo no bloquea:
+  // si el modelo no cargó o no hay chunks, continúa con [].
   let ragChunks: AgentContext['ragChunks'] = [];
-  if (process.env.OPENAI_API_KEY) {
-    const embeddingResult = await embed(message);
+  {
+    const embeddingResult = await embed(message, 'query');
     if (embeddingResult.ok) {
       const ragTopK = rules.rag_top_k.value ?? 5;
       const ragThreshold = rules.rag_top_k.threshold ?? 0.75;

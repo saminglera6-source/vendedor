@@ -1,61 +1,77 @@
 /**
- * Embeddings con OpenAI text-embedding-3-small.
+ * Embeddings locales con Transformers.js (sin API, sin key, sin costo).
+ *
+ * Modelo: Xenova/multilingual-e5-small — multilingüe (incl. español),
+ * 384 dimensiones. Se descarga una sola vez (~120 MB) a la caché local
+ * y después corre 100% offline sobre CPU.
+ *
+ * El modelo e5 requiere prefijos:
+ *   - "query: "   para el texto de búsqueda
+ *   - "passage: " para los documentos indexados
  *
  * Retorna Result<number[]> — nunca lanza excepciones al caller.
- * El cliente se inicializa en el primer uso (lazy singleton).
  */
 
-import OpenAI from 'openai';
 import { type Result } from '../types.js';
 
 // ---------------------------------------------------------------------------
-// Singleton
+// Config
 // ---------------------------------------------------------------------------
 
-let _openai: OpenAI | null = null;
+const MODEL = process.env.EMBEDDING_MODEL ?? 'Xenova/multilingual-e5-small';
+export const EMBEDDING_DIMENSIONS = Number(process.env.EMBEDDING_DIMENSIONS ?? 384);
 
-function getOpenAI(): OpenAI {
-  if (_openai) return _openai;
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) throw new Error('OPENAI_API_KEY no definida — requerida para RAG');
-  _openai = new OpenAI({ apiKey: key });
-  return _openai;
+// e5 fue entrenado con ventana de 512 tokens (~2.000 chars en español).
+const MAX_INPUT_CHARS = 2_000;
+
+type EmbedKind = 'query' | 'passage';
+
+// ---------------------------------------------------------------------------
+// Singleton del pipeline (carga perezosa)
+// ---------------------------------------------------------------------------
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _extractor: any = null;
+let _loading: Promise<unknown> | null = null;
+
+async function getExtractor(): Promise<unknown> {
+  if (_extractor) return _extractor;
+  if (!_loading) {
+    _loading = (async () => {
+      const { pipeline, env } = await import('@xenova/transformers');
+      // Solo modelos remotos de HuggingFace; caché en node_modules/.cache
+      env.allowLocalModels = false;
+      _extractor = await pipeline('feature-extraction', MODEL);
+      return _extractor;
+    })();
+  }
+  await _loading;
+  return _extractor;
 }
 
-const MODEL = process.env.EMBEDDING_MODEL ?? 'text-embedding-3-small';
-const DIMENSIONS = Number(process.env.EMBEDDING_DIMENSIONS ?? 1536);
-
-// OpenAI limita la entrada a ~8191 tokens. En español, 1 token ≈ 4 chars.
-// Truncamos a 32.000 chars como margen seguro sin cortar la semántica.
-const MAX_INPUT_CHARS = 32_000;
+function prep(text: string, kind: EmbedKind): string {
+  const trimmed = text.length > MAX_INPUT_CHARS ? text.slice(0, MAX_INPUT_CHARS) : text;
+  return `${kind}: ${trimmed}`;
+}
 
 // ---------------------------------------------------------------------------
-// embed
+// API pública
 // ---------------------------------------------------------------------------
 
 /**
  * Genera el embedding de un texto.
- *
- * @param text - Texto a vectorizar. Se trunca si supera MAX_INPUT_CHARS.
- * @returns Vector de 1536 dimensiones, o error si la API falla.
+ * @param text - texto a vectorizar
+ * @param kind - 'query' para búsquedas, 'passage' para documentos (default)
  */
-export async function embed(text: string): Promise<Result<number[]>> {
+export async function embed(
+  text: string,
+  kind: EmbedKind = 'passage',
+): Promise<Result<number[]>> {
   try {
-    const client = getOpenAI();
-    const input = text.length > MAX_INPUT_CHARS ? text.slice(0, MAX_INPUT_CHARS) : text;
-
-    const response = await client.embeddings.create({
-      model: MODEL,
-      input,
-      dimensions: DIMENSIONS,
-    });
-
-    const embedding = response.data[0]?.embedding;
-    if (!embedding) {
-      return { ok: false, error: new Error('OpenAI no devolvió embedding en la respuesta') };
-    }
-
-    return { ok: true, value: embedding };
+    const extractor = await getExtractor();
+    // @ts-expect-error — el pipeline es callable pero sin tipos precisos
+    const output = await extractor(prep(text, kind), { pooling: 'mean', normalize: true });
+    return { ok: true, value: Array.from(output.data as Float32Array) };
   } catch (error) {
     return {
       ok: false,
@@ -65,33 +81,28 @@ export async function embed(text: string): Promise<Result<number[]>> {
 }
 
 /**
- * Genera embeddings para un batch de textos en una sola llamada.
- * Más eficiente que llamar embed() N veces cuando hay muchos textos.
+ * Genera embeddings para un batch de textos.
+ * Transformers.js no paraleliza en CPU, así que procesa secuencialmente,
+ * pero mantiene la misma interfaz que la versión OpenAI.
  *
- * @param texts - Array de textos a vectorizar (máx. 2048 por request)
- * @returns Array de vectores en el mismo orden que `texts`
+ * @param texts - textos a vectorizar
+ * @param kind  - 'query' o 'passage' (default)
  */
-export async function embedBatch(texts: string[]): Promise<Result<number[][]>> {
+export async function embedBatch(
+  texts: string[],
+  kind: EmbedKind = 'passage',
+): Promise<Result<number[][]>> {
   if (texts.length === 0) return { ok: true, value: [] };
 
   try {
-    const client = getOpenAI();
-    const inputs = texts.map((t) =>
-      t.length > MAX_INPUT_CHARS ? t.slice(0, MAX_INPUT_CHARS) : t,
-    );
-
-    const response = await client.embeddings.create({
-      model: MODEL,
-      input: inputs,
-      dimensions: DIMENSIONS,
-    });
-
-    // La API devuelve los embeddings en el mismo orden que los inputs
-    const embeddings = response.data
-      .sort((a, b) => a.index - b.index)
-      .map((d) => d.embedding);
-
-    return { ok: true, value: embeddings };
+    const extractor = await getExtractor();
+    const out: number[][] = [];
+    for (const t of texts) {
+      // @ts-expect-error — pipeline callable sin tipos precisos
+      const output = await extractor(prep(t, kind), { pooling: 'mean', normalize: true });
+      out.push(Array.from(output.data as Float32Array));
+    }
+    return { ok: true, value: out };
   } catch (error) {
     return {
       ok: false,

@@ -40,8 +40,9 @@ Completar en `.env` como mínimo:
 | `SUPABASE_URL` | ✅ | URL del proyecto |
 | `SUPABASE_SERVICE_KEY` | ✅ | `service_role`, **no** la anon key |
 | `ANTHROPIC_API_KEY` | ✅ | |
-| `OPENAI_API_KEY` | ⬜ | Sin esto el RAG queda desactivado (el agente funciona igual) |
-| `KOMMO_*` | ⬜ | Solo para el canal WhatsApp/IG. Ver `.env.example` |
+| `KOMMO_*` | ⬜ | Solo para el canal WhatsApp/IG y para importar historial. Ver `.env.example` |
+
+Los embeddings del RAG corren con un modelo **local** (`Xenova/multilingual-e5-small`) — no hace falta ninguna API key. Se descarga ~120 MB la primera vez.
 
 `.env` está en `.gitignore` — nunca se commitea.
 
@@ -53,6 +54,7 @@ Aplicar las migraciones en orden desde el **SQL Editor** de Supabase:
 2. `supabase/migrations/002_seed_rules.sql` — business rules iniciales
 3. `supabase/migrations/003_rag_search_fn.sql` — función RPC para búsqueda vectorial
 4. `supabase/migrations/004_seed_products_example.sql` — **datos de ejemplo** (borrar/editar con catálogo real)
+5. `supabase/migrations/005_embeddings_local_384.sql` — ajusta el vector a 384 dim (embeddings locales)
 
 ### 5. Correr
 
@@ -83,16 +85,22 @@ Debería crear un lead + conversaciones en Supabase y devolver una respuesta del
 | `npm start` | Corre el build (`dist/api/routes.js`) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run test` / `npm run test:run` | Tests con vitest |
-| `npm run import-history` | Importa historial de chats al vector store (RAG) — requiere `OPENAI_API_KEY` y datos de entrada |
+| `npm run import-history` | Importa un export de Instagram (`_chat_analysis/`) al vector store |
+| `npm run import-kommo-history` | Importa el historial de conversaciones desde Kommo (`--dry-run`, `--max-talks=N`, `--origin=waba`) |
 
 ---
 
-## RAG (opcional)
+## RAG
 
-El pipeline detecta si `OPENAI_API_KEY` está definida; si no, salta la búsqueda vectorial
-sin errores. Para sembrar la base de conocimiento hace falta un export de conversaciones
-históricas (no incluido en el repo por privacidad de clientes) y correr
-`npm run import-history`.
+Embeddings locales (`Xenova/multilingual-e5-small`, 384 dim) — sin API key. El pipeline
+siempre intenta la búsqueda vectorial; si `knowledge_chunks` está vacía simplemente no
+aporta contexto y el agente funciona igual.
+
+Para sembrar la base de conocimiento con conversaciones reales:
+
+```bash
+npm run import-kommo-history        # requiere KOMMO_SUBDOMAIN + KOMMO_ACCESS_TOKEN (long-lived)
+```
 
 ---
 
