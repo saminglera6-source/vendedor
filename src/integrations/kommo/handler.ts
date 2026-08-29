@@ -336,12 +336,15 @@ function sleep(ms: number): Promise<void> {
 const rand = (min: number, max: number): number => min + Math.random() * (max - min);
 
 /**
- * Pausa antes de EMPEZAR a responder: entre 5 y 10 segundos desde que llega
- * el mensaje del cliente (como si la persona lo estuviera viendo y arrancara
- * a escribir). No depende del largo — eso lo cubre el tiempo de tipeo.
+ * Ventana de espera tras el último mensaje del cliente antes de empezar a
+ * responder. Da tiempo a que el cliente mande varios mensajes seguidos y el
+ * agente los lea todos juntos como una sola idea.
  */
+const DEBOUNCE_MS = Number(process.env['KOMMO_DEBOUNCE_MS'] ?? 10_000);
+
+/** Pequeña pausa natural después de la ventana de debounce, antes del primer fragmento. */
 function computeInitialDelay(): number {
-  return rand(5_000, 10_000);
+  return rand(1_000, 2_500);
 }
 
 /**
@@ -365,6 +368,16 @@ function computeTypingDelay(texto: string): number {
  * Diseñado para ser llamado desde routes.ts y retornar rápido (< 1 seg antes de
  * que Claude responda). El sync de Kommo se hace fire-and-forget.
  */
+interface LeadBuffer {
+  texts: string[];
+  timer: ReturnType<typeof setTimeout>;
+  leadId: number | undefined;
+  channel: string;
+}
+
+// Buffer de mensajes por lead mientras corre la ventana de debounce.
+const _pending = new Map<string, LeadBuffer>();
+
 export async function handleKommoMessage(
   payload: KommoMessageWebhook,
 ): Promise<Result<{ respuesta: string; escalated: boolean }>> {
@@ -407,7 +420,41 @@ export async function handleKommoMessage(
 
   console.info(`[kommo] Mensaje de ${phone} vía ${channel}: "${messageText.slice(0, 80)}"`);
 
-  // ── 4. Procesar con el agente ─────────────────────────────────────────────
+  // ── 4. Debounce: esperar ~10s por si el cliente manda más mensajes ────────
+  const existing = _pending.get(phone);
+  if (existing) {
+    clearTimeout(existing.timer);
+    if (messageText) existing.texts.push(messageText);
+    if (conversation.lead_id) existing.leadId = conversation.lead_id;
+    existing.timer = setTimeout(() => { void flushLeadTurn(phone); }, DEBOUNCE_MS);
+    console.info(`[kommo] +mensaje al buffer de ${phone} (${existing.texts.length}) — reinicia ventana ${DEBOUNCE_MS}ms`);
+    return { ok: true, value: { respuesta: '', escalated: false } };
+  }
+
+  _pending.set(phone, {
+    texts: messageText ? [messageText] : [],
+    leadId: conversation.lead_id,
+    channel,
+    timer: setTimeout(() => { void flushLeadTurn(phone); }, DEBOUNCE_MS),
+  });
+  console.info(`[kommo] buffer nuevo para ${phone} — ventana ${DEBOUNCE_MS}ms`);
+  return { ok: true, value: { respuesta: '', escalated: false } };
+}
+
+/**
+ * Se dispara cuando pasó la ventana de debounce sin mensajes nuevos.
+ * Toma todo lo que el cliente escribió y lo procesa como un solo turno.
+ */
+async function flushLeadTurn(phone: string): Promise<void> {
+  const buf = _pending.get(phone);
+  _pending.delete(phone);
+  if (!buf || buf.texts.length === 0) return;
+
+  const messageText = buf.texts.join('\n');
+  const { channel } = buf;
+  const leadId = buf.leadId;
+  console.info(`[kommo] flush ${phone}: ${buf.texts.length} mensaje(s) → 1 turno`);
+
   const processResult = await processMessage({
     phone,
     message: messageText,
@@ -418,37 +465,37 @@ export async function handleKommoMessage(
 
   if (!processResult.ok) {
     console.error('[kommo] processMessage falló:', processResult.error);
-    if (conversation.lead_id) {
-      addNote(conversation.lead_id, `⚠️ Error técnico procesando mensaje: ${processResult.error.message}`)
+    if (leadId) {
+      addNote(leadId, `⚠️ Error técnico procesando mensaje: ${processResult.error.message}`)
         .catch(() => void 0);
     }
-    return processResult;
+    return;
   }
 
   const { respuesta, agentResponse, escalated } = processResult.value;
   const fragmentos = agentResponse.fragmentos;
 
-  // ── 6–7. Delay humano + fragmentación + Salesbot ─────────────────────────
-  if (conversation.lead_id) {
+  // ── Fragmentación + tipeo humano + Salesbot ──────────────────────────────
+  if (leadId) {
     const fieldId = Number(process.env['KOMMO_FIELD_IA_RESPUESTA'] ?? '0');
     if (fieldId > 0) {
       const parts = fragmentos ?? [respuesta];
 
-      // 1) Pausa antes de arrancar a responder (5–10s).
+      // Pausa natural corta tras la ventana de debounce (la espera larga ya pasó).
       const initialDelay = computeInitialDelay();
-      console.info(`[FRAGMENTED] lead=${conversation.lead_id} parts=${parts.length} initial_delay=${Math.round(initialDelay)}ms`);
+      console.info(`[FRAGMENTED] lead=${leadId} parts=${parts.length} initial_delay=${Math.round(initialDelay)}ms`);
       await sleep(initialDelay);
 
-      // 2) Cada fragmento se envía tras su propio tiempo de tipeo (∝ largo).
-      //    Así los mensajes van de a poco, no los 3 de golpe.
+      // Cada fragmento se envía tras su propio tiempo de tipeo (∝ largo),
+      // así los mensajes van de a poco y no los 3 de golpe.
       for (let i = 0; i < parts.length; i++) {
         const typing = computeTypingDelay(parts[i]!);
         if (i > 0) await sleep(typing);
-        else if (parts.length === 1) await sleep(typing * 0.5); // mensaje único: un toque más
-        console.info(`[FRAGMENT] lead=${conversation.lead_id} part=${i + 1}/${parts.length} typing=${Math.round(typing)}ms`);
-        const fieldResult = await updateLeadCustomField(conversation.lead_id, fieldId, parts[i]!);
+        else if (parts.length === 1) await sleep(typing * 0.5);
+        console.info(`[FRAGMENT] lead=${leadId} part=${i + 1}/${parts.length} typing=${Math.round(typing)}ms`);
+        const fieldResult = await updateLeadCustomField(leadId, fieldId, parts[i]!);
         if (!fieldResult.ok) console.error('[kommo] updateLeadCustomField falló:', fieldResult.error.message);
-        const botResult = await launchSalesbot(conversation.lead_id);
+        const botResult = await launchSalesbot(leadId);
         if (!botResult.ok) console.error('[kommo] launchSalesbot falló:', botResult.error.message);
       }
     } else {
@@ -458,16 +505,14 @@ export async function handleKommoMessage(
     console.warn('[kommo] Sin lead_id — no se puede lanzar Salesbot');
   }
 
-  // ── 8. Sync con Kommo (fire-and-forget) ───────────────────────────────────
-  if (conversation.lead_id) {
+  // ── Sync con Kommo (fire-and-forget) ─────────────────────────────────────
+  if (leadId) {
     const tipo = classifyTipoConsulta(messageText, agentResponse);
-    syncToKommo(conversation.lead_id, agentResponse, tipo, channel)
+    syncToKommo(leadId, agentResponse, tipo, channel)
       .catch((err: unknown) => { console.error('[kommo] syncToKommo falló (no crítico):', err); });
   }
 
   if (escalated) {
     console.warn(`[kommo] 🔴 Lead escalado — phone: ${phone} score: ${agentResponse.lead_score}`);
   }
-
-  return { ok: true, value: { respuesta, escalated } };
 }

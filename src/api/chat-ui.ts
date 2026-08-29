@@ -70,7 +70,6 @@ export const CHAT_SIM_HTML = /* html */ `<!doctype html>
   const wait = (ms) => new Promise(r => setTimeout(r, ms));
   const rand = (a, b) => a + Math.random() * (b - a);
   // Mismo criterio que src/integrations/kommo/handler.ts
-  const initialDelay = () => rand(5000, 10000);
   const typingDelay = (t) => Math.min(12000, Math.max(1400, (700 + t.length * 55) * rand(0.82, 1.22)));
 
   function addBubble(text, dir){
@@ -91,12 +90,27 @@ export const CHAT_SIM_HTML = /* html */ `<!doctype html>
     log.scrollTop = log.scrollHeight;
   }
 
-  async function send(){
+  const DEBOUNCE_MS = 10000;
+  let pending = [];
+  let debounceTimer = null;
+
+  function send(){
     const text = input.value.trim();
     if(!text) return;
     input.value = '';
-    sendBtn.disabled = true;
     addBubble(text, 'out');
+    pending.push(text);
+    clearTimeout(debounceTimer);
+    // En modo real: esperar ~10s por si mandás otro mensaje. En modo rápido: al toque.
+    debounceTimer = setTimeout(fireTurn, rtBox.checked ? DEBOUNCE_MS : 150);
+    typing.style.display = rtBox.checked ? 'none' : 'block';
+  }
+
+  async function fireTurn(){
+    if(pending.length === 0) return;
+    const text = pending.join('\\n');
+    pending = [];
+    sendBtn.disabled = true;
     typing.style.display = 'block';
     try{
       const r = await fetch('/message', {
@@ -109,10 +123,10 @@ export const CHAT_SIM_HTML = /* html */ `<!doctype html>
       const parts = j.data.agentResponse.fragmentos || [j.data.respuesta];
       const rt = rtBox.checked;
 
-      // 1) pausa antes de arrancar a responder (5-10s en modo real)
-      await wait(rt ? initialDelay() : 200);
+      // La espera larga (debounce ~10s) ya pasó — sólo una pausa natural corta
+      await wait(rt ? 1200 + Math.random()*1300 : 150);
 
-      // 2) cada fragmento tras su tiempo de tipeo (∝ largo)
+      // cada fragmento tras su tiempo de tipeo (∝ largo)
       for(let i = 0; i < parts.length; i++){
         const td = rt ? typingDelay(parts[i]) : 250;
         if(i > 0 || parts.length === 1) { typing.style.display = 'block'; await wait(i === 0 ? td * 0.5 : td); }
