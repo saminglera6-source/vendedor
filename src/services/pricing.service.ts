@@ -45,9 +45,16 @@ export interface TomaRow {
   pin: number;
 }
 
+export interface CuotaCoef {
+  cuotas: number;
+  coeficiente: number;
+  mostrar: boolean;
+}
+
 export interface PricingData {
   precios: PrecioRow[];
   toma: TomaRow[];
+  cuotasCoef: CuotaCoef[];
   fetchedAt: number;
 }
 
@@ -71,7 +78,7 @@ function isFresh(c: PricingData | null): c is PricingData {
 interface ApiResponse {
   ok: boolean;
   error?: string;
-  data?: { precios?: unknown[]; toma?: unknown[] };
+  data?: { precios?: unknown[]; toma?: unknown[]; cuotas_coef?: unknown[] };
 }
 
 function toNum(v: unknown): number {
@@ -110,7 +117,84 @@ function normalizeRows(raw: ApiResponse['data']): PricingData {
       pin: toNum(r['pin']),
     }));
 
-  return { precios, toma, fetchedAt: Date.now() };
+  const cuotasCoef: CuotaCoef[] = (raw?.cuotas_coef ?? [])
+    .map((r) => r as Record<string, unknown>)
+    .map((r) => ({
+      cuotas: toNum(r['cuotas']),
+      coeficiente: toNum(r['coeficiente']),
+      mostrar: r['mostrar'] !== false,
+    }))
+    .filter((c) => c.cuotas > 0 && c.coeficiente > 0)
+    .sort((a, b) => a.cuotas - b.cuotas);
+
+  return { precios, toma, cuotasCoef, fetchedAt: Date.now() };
+}
+
+/** Cuotas exactas para un monto: total = round(monto × coef); porCuota = round(total / n). */
+export function calcularCuotas(
+  monto: number,
+  coefs: CuotaCoef[],
+): Array<{ cuotas: number; porCuota: number; total: number }> {
+  if (!(monto > 0)) return [];
+  return coefs
+    .filter((c) => c.mostrar && c.cuotas > 1)
+    .map((c) => {
+      const total = Math.round(monto * c.coeficiente);
+      return { cuotas: c.cuotas, porCuota: Math.round(total / c.cuotas), total };
+    });
+}
+
+const FALLA_KEYWORDS: Array<[keyof TomaRow, RegExp]> = [
+  ['pantalla', /\b(pantalla|display|rajad|rota|quebrad|fisurad|trizad|manchas?\s+en\s+la\s+pantalla|pixel)/i],
+  ['bateria', /\b(bater[ií]a\s+(mala|gastada|baja|para\s+cambiar)|salud\s+de\s+bater[ií]a\s+baj|cambiar\s+la\s+bater[ií]a)/i],
+  ['camara', /\b(c[aá]mara\s+(rota|fallada|con\s+manchas|empañad|no\s+enfoca)|manchas?\s+en\s+la\s+c[aá]mara)/i],
+  ['microfono', /\b(micr[oó]fono|no\s+se\s+escucha\s+cuando\s+hablo|no\s+me\s+escuchan)/i],
+  ['parlante', /\b(parlante|altavoz|auricular\s+de\s+llamada|no\s+se\s+escucha\s+el\s+audio)/i],
+  ['tapa', /\b(tapa\s+(trasera|de\s+atr[aá]s)\s+(rota|rajad|quebrad)|vidrio\s+de\s+atr[aá]s\s+roto)/i],
+  ['marco', /\b(marco\s+(golpead|abollad|doblad)|chasis\s+golpead|golpes?\s+en\s+el\s+marco|abollad)/i],
+  ['pin', /\b(pin\s+de\s+carga|no\s+carga\s+bien|puerto\s+de\s+carga|conector\s+de\s+carga)/i],
+];
+
+/** Detecta fallas mencionadas en texto libre. Devuelve el set de claves de TomaRow. */
+export function detectFallas(text: string): Array<keyof TomaRow> {
+  const found: Array<keyof TomaRow> = [];
+  for (const [key, rx] of FALLA_KEYWORDS) {
+    if (rx.test(text)) found.push(key);
+  }
+  return found;
+}
+
+// Frases que introducen el equipo que el cliente ENTREGA (no el que quiere comprar).
+const PERMUTA_INTRO = new RegExp(
+  '(entrego|entregando|doy|dando|dejo|tengo)\\s+(un|una|el|la|mi)?\\s*(iphone|i ?phone|1[0-7])' +
+  '|a\\s+cuenta|parte\\s+de\\s+pago|en\\s+permuta|hacen\\s+permuta|hacen\\s+canje|de\\s+canje' +
+  '|cu[aá]nto\\s+me\\s+tom|me\\s+tom[aá]n|lo\\s+entrego|para\\s+entregar',
+  'i',
+);
+
+/**
+ * Detecta el equipo que el cliente ofrece en parte de pago.
+ * Toma el segmento de texto a partir de la frase de permuta y busca ahí el
+ * modelo/almacenamiento, para no confundirlo con el equipo que quiere comprar.
+ */
+export function detectTradeIn(text: string): { modelo: string; almacenamiento: string | null } | null {
+  const m = PERMUTA_INTRO.exec(text);
+  if (!m) return null;
+  const segmento = text.slice(m.index);
+
+  // Modelo: normalizeModel primero; si falla, número suelto en el segmento.
+  let modelo = normalizeModel(segmento);
+  if (!modelo) {
+    const num = /\b(1[1-7]|xs\s*max|xr|xs|x|8\s*plus|8)\s*(pro\s*max|pro|plus|mini)?/i.exec(segmento);
+    if (num) {
+      const base = /^\d/.test(num[1]!) ? `iPhone ${num[1]}` : `iPhone ${num[1]!.toUpperCase()}`;
+      const variante = num[2] ? ` ${num[2].replace(/\s+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}` : '';
+      modelo = (base + variante).replace('Xs', 'XS').replace('Xr', 'XR');
+    }
+  }
+  if (!modelo) return null;
+
+  return { modelo, almacenamiento: normalizeStorage(segmento) ?? normalizeStorage(text) };
 }
 
 /**
@@ -211,18 +295,22 @@ export function findToma(
 }
 
 /** Valor de toma orientativo = impecable − suma de fallas presentes. */
+const FALLA_LABEL: Record<string, string> = {
+  bateria: 'batería', pantalla: 'pantalla', camara: 'cámara', microfono: 'micrófono',
+  parlante: 'parlante', tapa: 'tapa trasera', marco: 'marco', pin: 'pin de carga',
+};
+
+/** Valor de toma exacto = impecable − suma de descuentos de las fallas presentes. */
 export function estimarToma(
   row: TomaRow,
-  fallas: Partial<Record<'bateria' | 'pantalla' | 'camara' | 'microfono' | 'parlante' | 'tapa' | 'marco' | 'pin', boolean>>,
+  fallas: Array<keyof TomaRow>,
 ): { base: number; deducciones: Array<{ parte: string; monto: number }>; total: number } {
-  const map: Array<[keyof typeof fallas, string]> = [
-    ['bateria', 'batería'], ['pantalla', 'pantalla'], ['camara', 'cámara'],
-    ['microfono', 'micrófono'], ['parlante', 'parlante'], ['tapa', 'tapa trasera'],
-    ['marco', 'marco'], ['pin', 'pin de carga'],
-  ];
   const deducciones: Array<{ parte: string; monto: number }> = [];
-  for (const [key, label] of map) {
-    if (fallas[key]) deducciones.push({ parte: label, monto: row[key] });
+  for (const key of fallas) {
+    const label = FALLA_LABEL[key as string];
+    if (label && typeof row[key] === 'number' && row[key] > 0) {
+      deducciones.push({ parte: label, monto: row[key] });
+    }
   }
   const total = Math.max(0, row.impecable - deducciones.reduce((s, d) => s + d.monto, 0));
   return { base: row.impecable, deducciones, total };

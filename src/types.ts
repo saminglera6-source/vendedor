@@ -259,29 +259,39 @@ export type LeadScoringEvent =
   | 'rechazo_fuerte'
   | 'sin_respuesta_24h';
 
-/** Mapa de evento → delta de puntos */
+/**
+ * Mapa de evento → delta de puntos.
+ *
+ * Escala deliberadamente CONSERVADORA: subir en el score tiene que costar.
+ * Las señales de interés (precio, disponibilidad, permuta, specs) suman poco;
+ * solo una intención de compra explícita y repetida lleva el score arriba.
+ * Un solo mensaje no debe pasar de ~15-20 puntos por más señales que traiga.
+ */
 export const LEAD_SCORE_DELTA: Record<LeadScoringEvent, number> = {
-  primer_contacto: 5,
-  pregunta_disponibilidad: 10,
-  pregunta_precio: 15,
-  pregunta_specs: 10,
-  comparacion_modelos: 15,
-  pregunta_envio: 10,
-  pregunta_garantia: 10,
-  menciona_presupuesto: 20,
-  menciona_fecha_compra: 20,
-  producto_para_regalo: 15,
-  pregunta_cuotas: 15,
-  da_ciudad_direccion: 15,
-  menciona_permuta: 20,
-  pide_link_pago: 30,
-  dice_lo_quiero: 30,
-  responde_followup: 15,
-  rechazo_suave: -5,
-  rechazo_moderado: -15,
-  rechazo_fuerte: -20,
-  sin_respuesta_24h: -5,
+  primer_contacto: 2,
+  pregunta_disponibilidad: 4,
+  pregunta_precio: 6,
+  pregunta_specs: 3,
+  comparacion_modelos: 6,
+  pregunta_envio: 4,
+  pregunta_garantia: 3,
+  menciona_presupuesto: 8,
+  menciona_fecha_compra: 8,
+  producto_para_regalo: 5,
+  pregunta_cuotas: 6,
+  da_ciudad_direccion: 6,
+  menciona_permuta: 7,
+  pide_link_pago: 22,
+  dice_lo_quiero: 18,
+  responde_followup: 6,
+  rechazo_suave: -8,
+  rechazo_moderado: -18,
+  rechazo_fuerte: -25,
+  sin_respuesta_24h: -6,
 } as const;
+
+/** Tope de puntos que un solo mensaje puede sumar (antes de aplicar clamp global). */
+export const MAX_SCORE_GAIN_PER_MESSAGE = 20;
 
 /** Rangos de score → estado esperado (referencia para el agente) */
 export const LEAD_SCORE_RANGES: Array<{
@@ -443,12 +453,25 @@ export interface LivePricingContext {
     precioARS: number;
     preventaARS: number;
     precioUSD: number;
+    /** Cuotas exactas sobre el precio contado (calculadas en código, no por el modelo) */
+    cuotasContado: Array<{ cuotas: number; porCuota: number }>;
+    /** Cuotas exactas sobre el precio de preventa */
+    cuotasPreventa: Array<{ cuotas: number; porCuota: number }>;
   }>;
   /** Fila de toma (canje) del modelo que el cliente quiere entregar, si aplica */
   toma: {
     modelo: string;
     impecable: number;
     deducciones: Record<string, number>;
+    /**
+     * Valuación ya calculada en código a partir de las fallas detectadas en
+     * la conversación. null si no se detectó ninguna falla todavía.
+     */
+    calculada: {
+      fallasDetectadas: string[];
+      deducciones: Array<{ parte: string; monto: number }>;
+      total: number;
+    } | null;
   } | null;
   /** Antigüedad del dato en minutos (para saber si está fresco) */
   edadMinutos: number;

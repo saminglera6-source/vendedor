@@ -29,7 +29,15 @@ import { createAiFeedback } from '../db/ai-feedback.js';
 
 // — Services —
 import { matchFromMessage } from '../services/product-matching.service.js';
-import { getPricing, findPrecios, findToma } from '../services/pricing.service.js';
+import {
+  getPricing,
+  findPrecios,
+  findToma,
+  calcularCuotas,
+  estimarToma,
+  detectFallas,
+  detectTradeIn,
+} from '../services/pricing.service.js';
 import { assessLead } from '../services/lead-scoring.service.js';
 import { getOrCreate, applyPatch, regenerateResumen } from '../services/customer-memory.service.js';
 
@@ -237,12 +245,33 @@ export async function processMessage(
             precioARS: p.precioARS,
             preventaARS: p.preventaARS,
             precioUSD: p.precioUSD,
+            cuotasContado: calcularCuotas(p.precioARS, data.cuotasCoef).map((c) => ({
+              cuotas: c.cuotas,
+              porCuota: c.porCuota,
+            })),
+            cuotasPreventa: calcularCuotas(p.preventaARS, data.cuotasCoef).map((c) => ({
+              cuotas: c.cuotas,
+              porCuota: c.porCuota,
+            })),
           }))
         : [];
 
-      const modeloToma = memory?.raw_preferences?.modelo_actual ?? null;
-      const almToma = memory?.raw_preferences?.almacenamiento_actual ?? null;
+      // Texto de todos los mensajes del cliente en esta conversación
+      // (una falla o el modelo de canje puede haberse dicho hace 2 turnos).
+      const textoCliente = [
+        ...history.filter((h) => h.role === 'user').map((h) => h.content),
+        message,
+      ].join('  ·  ');
+
+      // Equipo a entregar: memoria si ya lo tiene, si no detectarlo del texto.
+      const tradeIn = detectTradeIn(textoCliente);
+      const modeloToma = memory?.raw_preferences?.modelo_actual ?? tradeIn?.modelo ?? null;
+      const almToma =
+        memory?.raw_preferences?.almacenamiento_actual ?? tradeIn?.almacenamiento ?? null;
       const tomaRow = modeloToma ? findToma(data, modeloToma, almToma) : null;
+
+      const fallas = detectFallas(`${textoCliente}  ·  ${memory?.raw_preferences?.estado_equipo ?? ''}`);
+      const tomaCalc = tomaRow && fallas.length > 0 ? estimarToma(tomaRow, fallas) : null;
 
       if (precios.length > 0 || tomaRow) {
         livePricing = {
@@ -261,6 +290,13 @@ export async function processMessage(
                   marco: tomaRow.marco,
                   'pin de carga': tomaRow.pin,
                 },
+                calculada: tomaCalc
+                  ? {
+                      fallasDetectadas: fallas.map(String),
+                      deducciones: tomaCalc.deducciones,
+                      total: tomaCalc.total,
+                    }
+                  : null,
               }
             : null,
           edadMinutos: Math.round((Date.now() - data.fetchedAt) / 60_000),
@@ -344,7 +380,13 @@ export async function processMessage(
   // Nuestro backend (`assessLead`) los calcula de forma determinista desde señales.
   // Regla de merge: usar la señal más fuerte para evitar que el agente
   // subestime el avance del lead.
-  const mergedScore = Math.max(agentResponse.lead_score, assessment.newScore);
+  // El backend (assessLead, determinista) manda. Claude puede empujar el score
+  // un poco por encima si lee intención que las keywords no captan, pero nunca
+  // más de +8 sobre la evaluación determinista — así "subir cuesta".
+  const mergedScore = Math.min(
+    Math.max(agentResponse.lead_score, assessment.newScore),
+    assessment.newScore + 8,
+  );
   const mergedEstado = advanceEstado(agentResponse.estado, assessment.suggestedEstado);
   const mergedRequiereHumano = agentResponse.requiere_humano || assessment.requiresHuman;
 

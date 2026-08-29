@@ -946,11 +946,20 @@ function buildDynamicBlock(
       : '';
     const lines = livePricing.precios.map((p) => {
       const alm = p.almacenamiento ? ` ${p.almacenamiento}` : '';
-      return `- ${p.modelo}${alm}: contado ${formatPrice(p.precioARS)} · preventa ${formatPrice(p.preventaARS)}` +
+      let l = `- ${p.modelo}${alm}: contado ${formatPrice(p.precioARS)} · preventa ${formatPrice(p.preventaARS)}` +
         (p.precioUSD ? ` · u$s ${p.precioUSD}` : '');
+      if (p.cuotasContado.length > 0) {
+        const c = p.cuotasContado.map((x) => `${x.cuotas}×${formatPrice(x.porCuota)}`).join(' | ');
+        l += `\n   cuotas s/contado: ${c}`;
+      }
+      if (p.cuotasPreventa.length > 0) {
+        const c = p.cuotasPreventa.map((x) => `${x.cuotas}×${formatPrice(x.porCuota)}`).join(' | ');
+        l += `\n   cuotas s/preventa: ${c}`;
+      }
+      return l;
     });
     sections.push(
-      `PRECIOS EN VIVO${staleWarn} — usar SOLO estos valores para contado y preventa:\n` +
+      `PRECIOS EN VIVO${staleWarn} — usar SOLO estos valores. Contado, preventa y CUOTAS ya vienen calculados; NO recalcular.\n` +
       lines.join('\n') +
       `\nSi el cliente pide un almacenamiento que no está en esta lista → pedir el dato o data_faltante.`,
     );
@@ -979,12 +988,13 @@ function buildDynamicBlock(
     sections.push(`CONVERSACIONES SIMILARES ANTERIORES (referencia):\n${chunkLines.join('\n---\n')}`);
   }
 
-  // Plan Canje — contexto del equipo a permutar (cuando la memoria lo indica)
+  // Plan Canje — se activa si la memoria lo indica O si el pipeline resolvió
+  // una fila de toma en vivo para el equipo que el cliente mencionó.
   const raw = memory?.raw_preferences;
-  if (raw?.interesado_en_permuta && raw.modelo_actual) {
-    const parts = [`Modelo: ${raw.modelo_actual}`];
-    if (raw.almacenamiento_actual) parts.push(raw.almacenamiento_actual);
-    if (raw.estado_equipo) parts.push(`estado: ${raw.estado_equipo}`);
+  if ((raw?.interesado_en_permuta && raw.modelo_actual) || livePricing?.toma) {
+    const parts = [`Modelo: ${raw?.modelo_actual ?? livePricing?.toma?.modelo ?? '—'}`];
+    if (raw?.almacenamiento_actual) parts.push(raw.almacenamiento_actual);
+    if (raw?.estado_equipo) parts.push(`estado: ${raw.estado_equipo}`);
 
     let canje = `PLAN CANJE — EQUIPO QUE ENTREGA EL CLIENTE:\n${parts.join(' · ')}\n`;
     if (livePricing?.toma) {
@@ -996,9 +1006,35 @@ function buildDynamicBlock(
       canje +=
         `Valor de toma EN VIVO para ${t.modelo}:\n` +
         `- Base (impecable): ${formatPrice(t.impecable)}\n` +
-        `- Descuentos por falla: ${deds}\n` +
-        `Valor orientativo = base − (fallas que reporte el cliente). ` +
-        `La definitiva se confirma con el equipo en mano.`;
+        `- Descuentos por falla: ${deds}\n`;
+      if (t.calculada) {
+        const detalle = t.calculada.deducciones
+          .map((d) => `${d.parte} −${formatPrice(d.monto)}`)
+          .join(' · ');
+        canje +=
+          `VALOR CALCULADO (usar este número, NO recalcular): ${formatPrice(t.calculada.total)}\n` +
+          `  = ${formatPrice(t.impecable)}${detalle ? ' − ' + detalle : ''}\n` +
+          `  (fallas detectadas: ${t.calculada.fallasDetectadas.join(', ') || 'ninguna'})\n` +
+          `Si el cliente reporta MÁS fallas que estas, decir que la revisás y confirmás el valor exacto.`;
+      } else {
+        canje +=
+          'Todavía no se detectaron fallas concretas. Preguntar por el estado (pantalla, batería, ' +
+          'cuerpo) una cosa a la vez. Cuando estén, el sistema calcula el valor exacto — no estimarlo a mano.';
+      }
+      canje += '\nLa valuación definitiva siempre se confirma con el equipo en mano.';
+
+      // Diferencia a abonar ya calculada (contado/preventa − valor de toma)
+      if (t.calculada && livePricing.precios.length > 0) {
+        const toma = t.calculada.total;
+        const difLines = livePricing.precios.map((p) => {
+          const alm = p.almacenamiento ? ` ${p.almacenamiento}` : '';
+          return `- ${p.modelo}${alm}: te quedarían a abonar ${formatPrice(Math.max(0, p.precioARS - toma))} ` +
+            `(o ${formatPrice(Math.max(0, p.preventaARS - toma))} con preventa)`;
+        });
+        canje +=
+          `\n\nDIFERENCIA A ABONAR (ya calculada — usar tal cual, frase "te quedarían a abonar"):\n` +
+          difLines.join('\n');
+      }
     } else {
       canje +=
         'Sin valor de toma en vivo para este modelo. Pedir modelo, almacenamiento y estado; ' +

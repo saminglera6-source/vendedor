@@ -15,6 +15,7 @@
 
 import {
   LEAD_SCORE_DELTA,
+  MAX_SCORE_GAIN_PER_MESSAGE,
   LEAD_ESTADO,
   ESTADOS_ACTIVOS,
   clampScore,
@@ -425,11 +426,17 @@ export function applyEvents(
   currentScore: number,
   events: LeadScoringEvent[],
 ): ScoreResult {
-  let delta = 0;
+  let positivo = 0;
+  let negativo = 0;
 
   for (const event of events) {
-    delta += LEAD_SCORE_DELTA[event];
+    const d = LEAD_SCORE_DELTA[event];
+    if (d >= 0) positivo += d;
+    else negativo += d;
   }
+
+  // La ganancia por mensaje tiene tope; las restas no (un rechazo pega entero).
+  const delta = Math.min(positivo, MAX_SCORE_GAIN_PER_MESSAGE) + negativo;
 
   const newScore = clampScore(currentScore + delta);
 
