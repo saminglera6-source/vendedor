@@ -40,6 +40,9 @@ export const CHAT_SIM_HTML = /* html */ `<!doctype html>
 <header>
   <div class="avatar">GP</div>
   <div class="meta"><b>GreatPhones (agente)</b><span id="phone"></span></div>
+  <label style="font-size:12px;color:var(--wa-muted);display:flex;align-items:center;gap:5px;cursor:pointer">
+    <input type="checkbox" id="realtime" checked> tiempos reales
+  </label>
   <button id="reset">Nuevo cliente</button>
 </header>
 <div id="log"></div>
@@ -59,6 +62,16 @@ export const CHAT_SIM_HTML = /* html */ `<!doctype html>
   function newPhone(){ return '549' + Math.floor(1000000000 + Math.random()*8999999999); }
   function setPhone(){ phoneEl.textContent = 'simulando +' + phone; }
   setPhone();
+
+  const rtBox = document.getElementById('realtime');
+  try { rtBox.checked = localStorage.getItem('gp_realtime') !== '0'; } catch(e){}
+  rtBox.onchange = () => { try { localStorage.setItem('gp_realtime', rtBox.checked ? '1' : '0'); } catch(e){} };
+
+  const wait = (ms) => new Promise(r => setTimeout(r, ms));
+  const rand = (a, b) => a + Math.random() * (b - a);
+  // Mismo criterio que src/integrations/kommo/handler.ts
+  const initialDelay = () => rand(5000, 10000);
+  const typingDelay = (t) => Math.min(12000, Math.max(1400, (700 + t.length * 55) * rand(0.82, 1.22)));
 
   function addBubble(text, dir){
     const row = document.createElement('div');
@@ -92,10 +105,22 @@ export const CHAT_SIM_HTML = /* html */ `<!doctype html>
         body: JSON.stringify({ phone, message: text, channel:'whatsapp' })
       });
       const j = await r.json();
-      typing.style.display = 'none';
-      if(!j.ok){ addBubble('⚠️ error: ' + (j.error?.message || 'desconocido'), 'in'); return; }
+      if(!j.ok){ typing.style.display = 'none'; addBubble('⚠️ error: ' + (j.error?.message || 'desconocido'), 'in'); return; }
       const parts = j.data.agentResponse.fragmentos || [j.data.respuesta];
-      for(const p of parts){ addBubble(p, 'in'); await new Promise(res=>setTimeout(res, 350)); }
+      const rt = rtBox.checked;
+
+      // 1) pausa antes de arrancar a responder (5-10s en modo real)
+      await wait(rt ? initialDelay() : 200);
+
+      // 2) cada fragmento tras su tiempo de tipeo (∝ largo)
+      for(let i = 0; i < parts.length; i++){
+        const td = rt ? typingDelay(parts[i]) : 250;
+        if(i > 0 || parts.length === 1) { typing.style.display = 'block'; await wait(i === 0 ? td * 0.5 : td); }
+        typing.style.display = 'none';
+        addBubble(parts[i], 'in');
+        if(i < parts.length - 1) typing.style.display = 'block';
+      }
+      typing.style.display = 'none';
       addDebug(j.data.agentResponse);
     }catch(e){
       typing.style.display = 'none';
