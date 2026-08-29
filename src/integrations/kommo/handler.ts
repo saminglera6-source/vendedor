@@ -333,23 +333,26 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const rand = (min: number, max: number): number => min + Math.random() * (max - min);
+
 /**
- * Calcula el delay inicial antes de enviar el primer mensaje.
- * Heurística basada en longitud: textos cortos → delay corto (saludo),
- * textos largos → delay largo (presupuesto, canje, financiación).
+ * Pausa antes de EMPEZAR a responder: entre 5 y 10 segundos desde que llega
+ * el mensaje del cliente (como si la persona lo estuviera viendo y arrancara
+ * a escribir). No depende del largo — eso lo cubre el tiempo de tipeo.
  */
-function computeInitialDelay(respuesta: string): number {
-  const len = respuesta.length;
-  if (len < 50) {
-    // Saludo o respuesta muy corta: 5–15 segundos
-    return (5 + Math.random() * 10) * 1000;
-  }
-  if (len < 150) {
-    // Consulta normal: 10–25 segundos
-    return (10 + Math.random() * 15) * 1000;
-  }
-  // Presupuesto, canje, financiación (respuesta larga): 15–45 segundos
-  return (15 + Math.random() * 30) * 1000;
+function computeInitialDelay(): number {
+  return rand(5_000, 10_000);
+}
+
+/**
+ * Tiempo de "tipeo" de un mensaje antes de enviarlo. Proporcional al largo:
+ * un mensaje largo tarda más que uno corto, como si lo escribiera una persona.
+ * ~18 caracteres por segundo + arranque, con jitter, acotado a [1.4s, 12s].
+ */
+function computeTypingDelay(texto: string): number {
+  const base = 700 + texto.length * 55; // ≈ 18 cps
+  const jitter = rand(0.82, 1.22);
+  return Math.min(12_000, Math.max(1_400, base * jitter));
 }
 
 // ===========================================================================
@@ -430,17 +433,19 @@ export async function handleKommoMessage(
     const fieldId = Number(process.env['KOMMO_FIELD_IA_RESPUESTA'] ?? '0');
     if (fieldId > 0) {
       const parts = fragmentos ?? [respuesta];
-      const initialDelaySec = Math.round(computeInitialDelay(respuesta) / 1000);
 
-      console.info(`[FRAGMENTED] lead=${conversation.lead_id} parts=${parts.length} initial_delay=${initialDelaySec}`);
-      await sleep(initialDelaySec * 1000);
+      // 1) Pausa antes de arrancar a responder (5–10s).
+      const initialDelay = computeInitialDelay();
+      console.info(`[FRAGMENTED] lead=${conversation.lead_id} parts=${parts.length} initial_delay=${Math.round(initialDelay)}ms`);
+      await sleep(initialDelay);
 
+      // 2) Cada fragmento se envía tras su propio tiempo de tipeo (∝ largo).
+      //    Así los mensajes van de a poco, no los 3 de golpe.
       for (let i = 0; i < parts.length; i++) {
-        if (i > 0) {
-          const interDelay = Math.round(2000 + Math.random() * 2000);
-          await sleep(interDelay);
-        }
-        console.info(`[FRAGMENT] lead=${conversation.lead_id} part=${i + 1}/${parts.length}`);
+        const typing = computeTypingDelay(parts[i]!);
+        if (i > 0) await sleep(typing);
+        else if (parts.length === 1) await sleep(typing * 0.5); // mensaje único: un toque más
+        console.info(`[FRAGMENT] lead=${conversation.lead_id} part=${i + 1}/${parts.length} typing=${Math.round(typing)}ms`);
         const fieldResult = await updateLeadCustomField(conversation.lead_id, fieldId, parts[i]!);
         if (!fieldResult.ok) console.error('[kommo] updateLeadCustomField falló:', fieldResult.error.message);
         const botResult = await launchSalesbot(conversation.lead_id);

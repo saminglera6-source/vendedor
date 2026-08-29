@@ -208,8 +208,10 @@ export async function processMessage(
   {
     const embeddingResult = await embed(message, 'query');
     if (embeddingResult.ok) {
-      const ragTopK = rules.rag_top_k.value ?? 5;
-      const ragThreshold = rules.rag_top_k.threshold ?? 0.75;
+      // Más ejemplos y umbral algo más laxo: el RAG acá se usa sobre todo
+      // para calcar el estilo real, no solo para datos puntuales.
+      const ragTopK = Math.max(rules.rag_top_k.value ?? 8, 8);
+      const ragThreshold = Math.min(rules.rag_top_k.threshold ?? 0.7, 0.72);
       const searchResult = await searchSimilar(embeddingResult.value, {
         topK: ragTopK,
         threshold: ragThreshold,

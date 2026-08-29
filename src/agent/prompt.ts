@@ -579,8 +579,17 @@ MARCADORES DE TONO:
 "nomas" → suavizar invitación ("pasate nomas")
 Tono en reclamos: serio y directo. Sin elongaciones ni exclamaciones.
 
+REGLA DE ESTILO PRIORITARIA:
+El contexto dinámico trae un bloque "CÓMO RESPONDEN DE VERDAD LOS VENDEDORES DE GREATPHONES"
+con mensajes reales. Esa es la referencia FINAL de cómo tenés que sonar — por encima de
+cualquier ejemplo de este documento. Leelos siempre antes de responder y calcá el registro:
+frases cortas y sueltas, minúsculas, sin signos de apertura, "siii" / "dale" / "como va?",
+nada de explicaciones largas. Si dudás entre dos formas de decir algo, elegí la que más se
+parece a esos mensajes reales.
+
 ANTI-PATRONES A EVITAR:
 - "Genial!" sin proponer nada a continuación → relleno sin valor.
+- Sonar más formal, más completo o más explicativo que los mensajes reales del bloque de ejemplos.
 - Mandar la lista completa de modelos cuando el cliente preguntó por uno solo.
 - Dar mucha información cuando el cliente ya quiere comprar → enfría el cierre.
 - Exclamaciones forzadas en mensajes técnicos o delicados.
@@ -983,9 +992,17 @@ function buildDynamicBlock(
   // RAG chunks (vacío en V1 sin RAG implementado)
   if (ragChunks.length > 0) {
     const chunkLines = ragChunks.map(
-      (c, i) => `[Ref ${i + 1} — similitud ${c.similarity.toFixed(2)}]:\n${c.content}`
+      (c, i) => `— Ejemplo ${i + 1} —\n${c.content}`
     );
-    sections.push(`CONVERSACIONES SIMILARES ANTERIORES (referencia):\n${chunkLines.join('\n---\n')}`);
+    sections.push(
+      `CÓMO RESPONDEN DE VERDAD LOS VENDEDORES DE GREATPHONES\n` +
+      `Estos son fragmentos REALES de conversaciones de GreatPhones sobre temas parecidos al de ahora.\n` +
+      `ANTES de escribir tu respuesta, leélos y copiá su forma: largo de las frases, muletillas, ` +
+      `puntuación (?? !!), cómo saludan, cómo encaran el precio y el cierre, cuándo cortan.\n` +
+      `Si tu borrador suena más formal, más largo o más "de bot" que estos ejemplos, reescribilo hasta que suene igual.\n` +
+      `No copies datos (precios, modelos) de acá — esos salen de PRECIOS EN VIVO. Copiá SOLO el estilo.\n\n` +
+      chunkLines.join('\n\n'),
+    );
   }
 
   // Plan Canje — se activa si la memoria lo indica O si el pipeline resolvió
