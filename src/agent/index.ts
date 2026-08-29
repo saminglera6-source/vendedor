@@ -37,6 +37,7 @@ import {
   estimarToma,
   detectFallas,
   detectTradeIn,
+  detectModelosMencionados,
 } from '../services/pricing.service.js';
 import { assessLead } from '../services/lead-scoring.service.js';
 import { getOrCreate, applyPatch, regenerateResumen } from '../services/customer-memory.service.js';
@@ -235,13 +236,29 @@ export async function processMessage(
       const data = pricingResult.value;
       const parsed = matchResult.ok ? matchResult.value.parsed : undefined;
 
-      const modeloConsulta =
-        parsed?.modeloNormalizado ?? memory?.producto_interes ?? null;
       const almacenamientoConsulta =
         parsed?.almacenamiento ?? memory?.almacenamiento ?? null;
 
-      const precios = modeloConsulta
-        ? findPrecios(data, modeloConsulta, almacenamientoConsulta).map((p) => ({
+      // Todos los modelos nombrados en el mensaje (consultas tipo "el 15 y el 16 pro"),
+      // más el de la memoria como fallback.
+      const modelosMsg = detectModelosMencionados(message);
+      const modelosConsulta = modelosMsg.length > 0
+        ? modelosMsg
+        : [parsed?.modeloNormalizado ?? memory?.producto_interes].filter((x): x is string => !!x);
+
+      const preciosRaw = modelosConsulta.flatMap((mod) =>
+        findPrecios(data, mod, modelosConsulta.length > 1 ? null : almacenamientoConsulta),
+      );
+      // Dedup por modelo+almacenamiento
+      const vistos = new Set<string>();
+      const precios = preciosRaw
+        .filter((p) => {
+          const k = `${p.modelo}|${p.almacenamiento}`;
+          if (vistos.has(k)) return false;
+          vistos.add(k);
+          return true;
+        })
+        .map((p) => ({
             modelo: p.modelo,
             almacenamiento: p.almacenamiento,
             precioARS: p.precioARS,
@@ -255,8 +272,7 @@ export async function processMessage(
               cuotas: c.cuotas,
               porCuota: c.porCuota,
             })),
-          }))
-        : [];
+        }));
 
       // Texto de todos los mensajes del cliente en esta conversación
       // (una falla o el modelo de canje puede haberse dicho hace 2 turnos).
@@ -302,6 +318,7 @@ export async function processMessage(
               }
             : null,
           edadMinutos: Math.round((Date.now() - data.fetchedAt) / 60_000),
+          promoVigenteHasta: data.promoAplicadaA.length > 0 ? data.promoVigenteHasta : null,
         };
       }
     }

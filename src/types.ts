@@ -475,6 +475,8 @@ export interface LivePricingContext {
   } | null;
   /** Antigüedad del dato en minutos (para saber si está fresco) */
   edadMinutos: number;
+  /** Si el precio de preventa que se muestra es una PROMO por tiempo limitado: hasta cuándo. */
+  promoVigenteHasta: string | null;
 }
 
 // ===========================================================================

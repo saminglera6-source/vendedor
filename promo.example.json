@@ -1,0 +1,16 @@
+{
+  "_comentario": "Promo puntual: sobreescribe SOLO el preventa, sin tocar el Sheet. Se ignora cuando pasa vigente_hasta. Borrar este archivo desactiva la promo.",
+  "vigente_hasta": "2026-08-29",
+  "preventa": {
+    "iPhone 13|128GB": 560000,
+    "iPhone 13 Pro|128GB": 760000,
+    "iPhone 14|128GB": 585000,
+    "iPhone 14 Pro|128GB": 845000,
+    "iPhone 15|128GB": 810000,
+    "iPhone 15 Pro|128GB": 900000,
+    "iPhone 16|128GB": 970000,
+    "iPhone 16 Pro|128GB": 1250000,
+    "iPhone 17 Pro|256GB": 1960000,
+    "iPhone 17 Pro Max|256GB": 1975000
+  }
+}

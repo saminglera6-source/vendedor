@@ -10,3 +10,6 @@ instagram-*.zip
 INSTAGRAM_ANALYSIS.json
 vmlogs/
 .claude/settings.local.json
+
+# Promo puntual (se edita seguido, no versionar)
+promo.json

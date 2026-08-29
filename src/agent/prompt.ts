@@ -975,10 +975,16 @@ function buildDynamicBlock(
       }
       return l;
     });
+    const promoNote = livePricing.promoVigenteHasta
+      ? `\n⚡ El precio de PREVENTA de arriba es una PROMO por tiempo limitado (vigente hasta ${livePricing.promoVigenteHasta}). ` +
+        `Usalo con un poco de urgencia real: "esta semana está a este precio", "es la oferta de ahora". ` +
+        `Sin inventar: cuando pase esa fecha vuelve al valor habitual.`
+      : '';
     sections.push(
       `PRECIOS EN VIVO${staleWarn} — usar SOLO estos valores. Contado, preventa y CUOTAS ya vienen calculados; NO recalcular.\n` +
       lines.join('\n') +
-      `\nSi el cliente pide un almacenamiento que no está en esta lista → pedir el dato o data_faltante.`,
+      `\nSi el cliente pide un almacenamiento que no está en esta lista → pedir el dato o data_faltante.` +
+      promoNote,
     );
   } else {
     sections.push(

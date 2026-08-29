@@ -13,6 +13,7 @@
  * falla y hay caché vencida, se sirve la vencida (mejor stale que nada).
  */
 
+import { readFileSync } from 'node:fs';
 import { ok, err, type Result } from '../types.js';
 import { normalizeModel, normalizeStorage, normalizeText } from './product-matching.service.js';
 
@@ -56,6 +57,80 @@ export interface PricingData {
   toma: TomaRow[];
   cuotasCoef: CuotaCoef[];
   fetchedAt: number;
+  /** Si hay una promo puntual activa: hasta qué día (YYYY-MM-DD) rige. */
+  promoVigenteHasta: string | null;
+  /** Claves "modelo|almacenamiento" (normalizadas) cuyo preventa viene de la promo. */
+  promoAplicadaA: string[];
+}
+
+// ===========================================================================
+// Promo puntual — override temporal SIN tocar la lista maestra del Sheet
+// ===========================================================================
+// Archivo promo.json en la raíz del repo (gitignoreado). Formato:
+//   { "vigente_hasta": "2026-08-30",
+//     "preventa": { "iPhone 15|128GB": 810000, "iPhone 16 Pro|128GB": 1250000 } }
+// Se ignora entero si la fecha ya pasó. Borrar el archivo desactiva la promo.
+
+interface PromoFile {
+  vigente_hasta?: string;
+  preventa?: Record<string, number>;
+}
+
+function hoyISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function loadPromo(): { vigenteHasta: string; preventa: Map<string, number> } | null {
+  const path = process.env['PROMO_FILE'] ?? 'promo.json';
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf-8');
+  } catch {
+    return null; // sin archivo → sin promo
+  }
+  let parsed: PromoFile;
+  try {
+    parsed = JSON.parse(raw) as PromoFile;
+  } catch {
+    console.error('[pricing] promo.json inválido — se ignora');
+    return null;
+  }
+  const vigenteHasta = (parsed.vigente_hasta ?? '').trim();
+  if (!vigenteHasta || vigenteHasta < hoyISO()) return null; // vencida o sin fecha
+
+  const preventa = new Map<string, number>();
+  for (const [k, v] of Object.entries(parsed.preventa ?? {})) {
+    const [modeloRaw, almRaw] = k.split('|');
+    const modelo = normalizeModel(modeloRaw ?? '') ?? (modeloRaw ?? '').trim();
+    const alm = normalizeStorage(almRaw ?? '') ?? (almRaw ?? '').trim();
+    if (modelo && alm && Number(v) > 0) {
+      preventa.set(`${normalizeText(modelo)}|${alm.toLowerCase()}`, Number(v));
+    }
+  }
+  return preventa.size > 0 ? { vigenteHasta, preventa } : null;
+}
+
+function promoKey(modelo: string, almacenamiento: string): string {
+  const m = normalizeModel(modelo) ?? modelo;
+  const a = normalizeStorage(almacenamiento) ?? almacenamiento;
+  return `${normalizeText(m)}|${a.toLowerCase()}`;
+}
+
+/**
+ * Detecta TODOS los modelos de iPhone nombrados en un texto (para consultas
+ * tipo "comparame el 15 y el 16 pro"). Devuelve nombres canónicos, sin repetir.
+ */
+export function detectModelosMencionados(text: string): string[] {
+  const t = normalizeText(text);
+  // El número de modelo no puede venir seguido de otro dígito (evita "128" → "12").
+  const rx = /\b(iphone\s*)?(1[1-7])(?!\d)\s*(pro\s*max|pro|plus|mini)?/g;
+  const out = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = rx.exec(t)) !== null) {
+    const variante = m[3] ? ' ' + m[3].replace(/\s+/g, ' ').replace(/pro max/, 'Pro Max').replace(/^pro$/, 'Pro').replace(/^plus$/, 'Plus').replace(/^mini$/, 'Mini') : '';
+    out.add(`iPhone ${m[2]}${variante}`);
+  }
+  return [...out];
 }
 
 // ===========================================================================
@@ -127,7 +202,39 @@ function normalizeRows(raw: ApiResponse['data']): PricingData {
     .filter((c) => c.cuotas > 0 && c.coeficiente > 0)
     .sort((a, b) => a.cuotas - b.cuotas);
 
-  return { precios, toma, cuotasCoef, fetchedAt: Date.now() };
+  return {
+    precios,
+    toma,
+    cuotasCoef,
+    fetchedAt: Date.now(),
+    promoVigenteHasta: null,
+    promoAplicadaA: [],
+  };
+}
+
+/**
+ * Devuelve una copia de `data` con la promo puntual aplicada sobre el preventa.
+ * Se ejecuta en cada getPricing() (no en el fetch) así editar/borrar promo.json
+ * se refleja casi al instante, sin depender del TTL de la caché del Sheet.
+ */
+function applyPromo(data: PricingData): PricingData {
+  const promo = loadPromo();
+  if (!promo) return data;
+
+  const promoAplicadaA: string[] = [];
+  const precios = data.precios.map((row) => {
+    const nuevo = promo.preventa.get(promoKey(row.modelo, row.almacenamiento));
+    if (nuevo === undefined || nuevo === row.preventaARS) return row;
+    promoAplicadaA.push(promoKey(row.modelo, row.almacenamiento));
+    return { ...row, preventaARS: nuevo };
+  });
+
+  return {
+    ...data,
+    precios,
+    promoVigenteHasta: promoAplicadaA.length > 0 ? promo.vigenteHasta : null,
+    promoAplicadaA,
+  };
 }
 
 /** Cuotas exactas para un monto: total = round(monto × coef); porCuota = round(total / n). */
@@ -203,7 +310,7 @@ export function detectTradeIn(text: string): { modelo: string; almacenamiento: s
  * el caller decide (el pipeline continúa sin bloque de precios).
  */
 export async function getPricing(): Promise<Result<PricingData>> {
-  if (isFresh(_cache)) return ok(_cache);
+  if (isFresh(_cache)) return ok(applyPromo(_cache));
 
   const url = process.env['PRICING_API_URL'];
   const token = process.env['PRICING_API_TOKEN'];
@@ -221,10 +328,10 @@ export async function getPricing(): Promise<Result<PricingData>> {
     if (!json.ok) throw new Error(json.error ?? 'respuesta ok:false');
 
     _cache = normalizeRows(json.data);
-    return ok(_cache);
+    return ok(applyPromo(_cache));
   } catch (e) {
     // Fallback: caché vencida si existe
-    if (_cache) return ok(_cache);
+    if (_cache) return ok(applyPromo(_cache));
     return err(e instanceof Error ? e : new Error(String(e)));
   }
 }
