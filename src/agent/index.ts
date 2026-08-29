@@ -29,6 +29,7 @@ import { createAiFeedback } from '../db/ai-feedback.js';
 
 // — Services —
 import { matchFromMessage } from '../services/product-matching.service.js';
+import { getPricing, findPrecios, findToma } from '../services/pricing.service.js';
 import { assessLead } from '../services/lead-scoring.service.js';
 import { getOrCreate, applyPatch, regenerateResumen } from '../services/customer-memory.service.js';
 
@@ -215,6 +216,59 @@ export async function processMessage(
     ? [...matchResult.value.variants, ...matchResult.value.alternatives].slice(0, 5)
     : [];
 
+  // ─── Paso 6.5: Precios en vivo desde el ERP ──────────────────────────────
+  // Fuente de verdad para contado, preventa y toma. Fallo no bloquea.
+  let livePricing: AgentContext['livePricing'] = null;
+  {
+    const pricingResult = await getPricing();
+    if (pricingResult.ok) {
+      const data = pricingResult.value;
+      const parsed = matchResult.ok ? matchResult.value.parsed : undefined;
+
+      const modeloConsulta =
+        parsed?.modeloNormalizado ?? memory?.producto_interes ?? null;
+      const almacenamientoConsulta =
+        parsed?.almacenamiento ?? memory?.almacenamiento ?? null;
+
+      const precios = modeloConsulta
+        ? findPrecios(data, modeloConsulta, almacenamientoConsulta).map((p) => ({
+            modelo: p.modelo,
+            almacenamiento: p.almacenamiento,
+            precioARS: p.precioARS,
+            preventaARS: p.preventaARS,
+            precioUSD: p.precioUSD,
+          }))
+        : [];
+
+      const modeloToma = memory?.raw_preferences?.modelo_actual ?? null;
+      const almToma = memory?.raw_preferences?.almacenamiento_actual ?? null;
+      const tomaRow = modeloToma ? findToma(data, modeloToma, almToma) : null;
+
+      if (precios.length > 0 || tomaRow) {
+        livePricing = {
+          precios,
+          toma: tomaRow
+            ? {
+                modelo: tomaRow.modelo,
+                impecable: tomaRow.impecable,
+                deducciones: {
+                  batería: tomaRow.bateria,
+                  pantalla: tomaRow.pantalla,
+                  cámara: tomaRow.camara,
+                  micrófono: tomaRow.microfono,
+                  parlante: tomaRow.parlante,
+                  'tapa trasera': tomaRow.tapa,
+                  marco: tomaRow.marco,
+                  'pin de carga': tomaRow.pin,
+                },
+              }
+            : null,
+          edadMinutos: Math.round((Date.now() - data.fetchedAt) / 60_000),
+        };
+      }
+    }
+  }
+
   // ─── Paso 7: Lead scoring ─────────────────────────────────────────────────
   const assessment = assessLead(message, lead, rules);
 
@@ -227,6 +281,7 @@ export async function processMessage(
     productVariants,
     rules,
     userMessage: message,
+    livePricing,
   };
 
   // ─── Paso 9: Llamar a Claude ─────────────────────────────────────────────

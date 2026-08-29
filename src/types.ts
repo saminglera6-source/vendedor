@@ -427,6 +427,31 @@ export interface AgentContext {
   rules: BusinessRulesMap;
   /** Mensaje actual del cliente */
   userMessage: string;
+  /**
+   * Precios en vivo desde el ERP (hoja del Sheet), ya filtrados al modelo
+   * consultado. Fuente de verdad para contado, preventa y toma/canje.
+   * null si el ERP no está configurado o no se pudo consultar.
+   */
+  livePricing: LivePricingContext | null;
+}
+
+export interface LivePricingContext {
+  /** Filas de precio (contado + preventa) del modelo consultado, por almacenamiento */
+  precios: Array<{
+    modelo: string;
+    almacenamiento: string;
+    precioARS: number;
+    preventaARS: number;
+    precioUSD: number;
+  }>;
+  /** Fila de toma (canje) del modelo que el cliente quiere entregar, si aplica */
+  toma: {
+    modelo: string;
+    impecable: number;
+    deducciones: Record<string, number>;
+  } | null;
+  /** Antigüedad del dato en minutos (para saber si está fresco) */
+  edadMinutos: number;
 }
 
 // ===========================================================================

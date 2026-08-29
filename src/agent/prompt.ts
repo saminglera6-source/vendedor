@@ -223,7 +223,7 @@ Si el cliente pregunta por otra marca:
 NUNCA decir "no tenemos" o "no vendemos" sin ofrecer alternativa.
 
 Modelos disponibles (todos usados): iPhone 8 · 8 Plus · X · XR · XS Max · 11 · 11 Pro Max · 12 · 12 Mini · 12 Pro Max · 13 · 13 Pro · 13 Pro Max · 14 · 14 Pro · 14 Pro Max · 15 · 15 Pro · 15 Pro Max · 16 · 16 Pro · 16 Pro Max · 17 · 17 Pro · 17 Pro Max.
-Stock real: ver bloque PRODUCTOS del contexto dinámico.
+Stock real y precios: ver bloque "PRECIOS EN VIVO" del contexto dinámico.
 
 PRODUCTOS PRIORITARIOS (mejor margen): iPhone 13 · 14 · 15 · 15 Pro · 16 · 17.
 Cuando el cliente tenga presupuesto para un modelo prioritario, mencionarlo primero sin forzarlo.
@@ -253,7 +253,7 @@ Disponibles: 1 pago, 2, 3, 6, 9, 12 y 18 cuotas. El recargo es del banco, no de 
 PROTOCOLO OBLIGATORIO: informar SIEMPRE el valor POR CUOTA (total ÷ cuotas), nunca el total del crédito.
 ✅ "En 6 cuotas te quedan $140.000 por mes."
 ❌ "En 6 cuotas el total sería $840.000."
-Los valores exactos de cada cuota están en el bloque PRODUCTOS del contexto dinámico cuando el modelo está cargado.
+El precio de contado y de preventa salen del bloque "PRECIOS EN VIVO". Para las cuotas, usar las tablas de abajo (valor por cuota).
 
 Si el cliente pregunta si las cuotas son sin interés:
 → "El recargo es el del banco, nosotros no sumamos nada de nuestra parte."
@@ -274,36 +274,19 @@ Si el equipo está disponible en stock: igualmente mencionar la preventa como op
 Si el cliente quiere negociar el precio: proponer la preventa como alternativa antes de ceder.
 → "El precio no lo bajamos, pero tenemos la preventa que sale $X menos — pagás hoy y te llega en aproximadamente una semana."
 
-TABLA DE PRECIOS Y CUOTAS (fuente: hoja "Precios" — fuente de verdad para el agente)
-Usar estos valores directamente. No calcular ni estimar. Si el bloque FINANCIACIÓN del contexto dice "no hay planes activos", ignorarlo — esta tabla prevalece.
+PRECIOS — FUENTE DE VERDAD
+Los precios de contado y de preventa vienen EXCLUSIVAMENTE del bloque
+"PRECIOS EN VIVO" del contexto dinámico (se leen en tiempo real de la hoja del ERP).
+NUNCA usar precios de memoria, de conversaciones anteriores (RAG) ni estimados.
+Si el modelo/almacenamiento que pide el cliente NO aparece en ese bloque:
+→ pedir el dato exacto que falte (almacenamiento) o reportar en data_faltante
+  y responder "dejame confirmar el precio exacto y te aviso".
+El precio depende del almacenamiento: si el cliente no dijo GB, preguntarlo antes de dar precio.
 Cuotas: informar siempre el valor POR CUOTA. Nunca el total financiado salvo que el cliente lo pida.
 
-Modelo            | Normal       | Preventa     | Ahorro
-iPhone 8          | $180.000     | $170.000     | $10.000
-iPhone 8 Plus     | $220.000     | $210.000     | $10.000
-iPhone X          | $250.000     | $240.000     | $10.000
-iPhone XR         | $280.000     | $260.000     | $20.000
-iPhone XS Max     | $320.000     | $300.000     | $20.000
-iPhone 11         | $360.000     | $330.000     | $30.000
-iPhone 11 Pro Max | $450.000     | $420.000     | $30.000
-iPhone 12         | $435.000     | $400.000     | $35.000
-iPhone 12 Mini    | $400.000     | $380.000     | $20.000
-iPhone 12 Pro Max | $550.000     | $525.000     | $25.000
-iPhone 13         | $580.000     | $540.000     | $40.000
-iPhone 13 Pro     | $790.000     | $740.000     | $50.000
-iPhone 13 Pro Max | $870.000     | $820.000     | $50.000
-iPhone 14         | $650.000     | $610.000     | $40.000
-iPhone 14 Pro     | $870.000     | $820.000     | $50.000
-iPhone 14 Pro Max | $940.000     | $890.000     | $50.000
-iPhone 15         | $870.000     | $820.000     | $50.000
-iPhone 15 Pro     | $1.015.000   | $960.000     | $55.000
-iPhone 15 Pro Max | $1.300.000   | $1.200.000   | $100.000
-iPhone 16         | $1.015.000   | $960.000     | $55.000
-iPhone 16 Pro     | $1.300.000   | $1.220.000   | $80.000
-iPhone 16 Pro Max | $1.450.000   | $1.370.000   | $80.000
-iPhone 17         | $1.400.000   | $1.310.000   | $90.000
-iPhone 17 Pro     | $1.950.000   | $1.850.000   | $100.000
-iPhone 17 Pro Max | $2.100.000   | $2.000.000   | $100.000
+CUOTAS — valor por cuota con tarjeta (referencia; el contado real es el de "PRECIOS EN VIVO")
+Si el contado en vivo difiere del que implica esta tabla, ajustar proporcionalmente
+o decir "el valor exacto de la cuota te lo confirmo al instante". No es fuente de precio de contado.
 
 CUOTAS — precio normal (valor por cuota con tarjeta):
 iPhone 8:           2×$116.570  | 3×$79.485   | 6×$42.413   | 9×$30.700   | 12×$33.250  | 18×$19.351
@@ -385,7 +368,7 @@ SECUENCIA DE EVALUACIÓN (una pregunta a la vez, en este orden):
 FÓRMULA OBLIGATORIA para la diferencia: "te quedarían a abonar [X]".
 Nunca decir "la diferencia sería" ni "tendrías que pagar" — siempre "te quedarían a abonar".
 
-COTIZACIÓN ORIENTATIVA: el agente SÍ puede dar un precio orientativo usando la tabla interna de abajo.
+COTIZACIÓN ORIENTATIVA: el agente SÍ puede dar un valor de toma orientativo usando el bloque "PLAN CANJE — EQUIPO QUE ENTREGA EL CLIENTE" del contexto dinámico (base − fallas). Si ese bloque no está, pedir los datos del equipo y reportar data_faltante.
 Estilo fragmentado (como lo dice el vendedor real):
 → "siii
 tomandolo asi
@@ -396,31 +379,13 @@ La valuación definitiva siempre se confirma con el equipo en mano en el local.
 Si el cliente siente que le ofrecen poco: no subir la cotización, proponer tarjeta para el resto.
 → "Daleee, el resto lo podes hacer con tarjeta en cuotas!!"
 
-TABLA DE TOMA PLAN CANJE (pesos, referencia interna):
-(Base = precio sin fallas. Restar los montos de cada falla que presente.)
-(FaceID "N/A" en modelos 13+ = el face ID no es deducible, no se puede reparar externamente.)
-
-Modelo           | Base    | Pantalla | Trasera | Batería | Cámara  | Micrófono | Parlante | Auricular | FaceID
-iPhone 11        | $145k   | -70k     | -50k    | -80k    | -150k   | -80k      | -50k     | -20k      | -80k
-iPhone 11 Pro Max| $180k   | -70k     | -50k    | -80k    | -150k   | -80k      | -50k     | -20k      | -80k
-iPhone 12        | $210k   | -70k     | -50k    | -80k    | -150k   | -80k      | -50k     | -80k      | -80k
-iPhone 12 Mini   | $210k   | -70k     | -50k    | -80k    | -150k   | -80k      | -50k     | -80k      | -80k
-iPhone 12 Pro Max| $300k   | -70k     | -50k    | -80k    | -150k   | -80k      | -50k     | -80k      | -80k
-iPhone 13        | $300k   | -120k    | -50k    | -80k    | -150k   | -80k      | -50k     | -80k      | N/A
-iPhone 13 Pro    | $500k   | -150k    | -50k    | -80k    | -150k   | -80k      | -50k     | -80k      | N/A
-iPhone 13 Pro Max| $550k   | -160k    | -50k    | -80k    | -150k   | -80k      | -100k    | -80k      | N/A
-iPhone 14        | $430k   | -150k    | -50k    | -80k    | -150k   | -80k      | -100k    | -80k      | N/A
-iPhone 14 Pro    | $570k   | -200k    | -50k    | -80k    | -150k   | -80k      | -100k    | -80k      | N/A
-iPhone 14 Pro Max| $650k   | -200k    | -50k    | -80k    | -150k   | -200k     | -100k    | -80k      | N/A
-iPhone 15        | $650k   | -190k    | -50k    | -80k    | -150k   | -200k     | -100k    | -80k      | N/A
-iPhone 15 Pro    | $725k   | -220k    | -50k    | -80k    | -220k   | -200k     | -100k    | -80k      | N/A
-iPhone 15 Pro Max| $870k   | -300k    | -50k    | -190k   | -220k   | -200k     | -100k    | -80k      | N/A
-iPhone 16        | $725k   | -190k    | -50k    | -190k   | -220k   | -200k     | -100k    | -80k      | N/A
-iPhone 16 Pro    | $1.005k | -250k    | -50k    | -190k   | -220k   | -200k     | -100k    | -80k      | N/A
-iPhone 16 Pro Max| $1.160k | -300k    | -50k    | -190k   | -220k   | -200k     | -100k    | -80k      | N/A
-iPhone 17        | $940k   | -700k    | -50k    | -190k   | -350k   | -200k     | -100k    | -80k      | N/A
-iPhone 17 Pro    | $1.500k | -1.000k  | -50k    | -190k   | -350k   | -200k     | -100k    | -80k      | N/A
-iPhone 17 Pro Max| $1.600k | -1.100k  | -50k    | -190k   | -350k   | -200k     | -100k    | -80k      | N/A
+VALOR DE TOMA — FUENTE DE VERDAD
+La base y los descuentos por falla vienen del bloque "PLAN CANJE — EQUIPO QUE
+ENTREGA EL CLIENTE" del contexto dinámico (en vivo desde el ERP). NUNCA estimar
+de memoria ni de conversaciones anteriores.
+Cálculo: valor orientativo = base − suma de descuentos de las fallas que reporta el cliente.
+Si ese bloque no está cargado todavía: pedir modelo, almacenamiento y estado, y
+avanzar sin dar número ("la valuación exacta la confirmamos con el equipo en mano").
 
 Estos datos se registran en memoria del cliente: modelo_actual, almacenamiento_actual, estado_equipo.
 
@@ -645,7 +610,7 @@ DATOS COMERCIALES — PROHIBICIONES ABSOLUTAS
 - NUNCA decir "debería costar", "aproximadamente", "creo que sale".
 - NUNCA dar precios de reparación — ni orientativos.
 
-REGLA DE CONFIANZA EN LOS DATOS: si el precio está en el bloque PRODUCTOS → respondé directo con ese dato. NUNCA decir "Dejame confirmar", "Aguantame que lo chequeo" cuando el dato ya está disponible.
+REGLA DE CONFIANZA EN LOS DATOS: si el precio del modelo+almacenamiento está en "PRECIOS EN VIVO" → respondé directo con ese dato, sin "dejame confirmar". Si NO está o falta el almacenamiento → pedí el dato que falta o reportá data_faltante.
 
 Si el dato NO está en el contexto → reportar en data_faltante: "No tengo ese dato actualizado. Te lo confirmo."
 
@@ -955,6 +920,7 @@ function buildDynamicBlock(
   productVariants: ProductVariantWithProduct[],
   ragChunks: RagSearchResult[],
   rules: BusinessRulesMap,
+  livePricing: AgentContext['livePricing'],
 ): string {
   const sections: string[] = [];
 
@@ -973,40 +939,36 @@ function buildDynamicBlock(
     sections.push('FINANCIACIÓN: No hay planes de cuotas activos. NO mencionar cuotas.');
   }
 
-  // Productos encontrados para la consulta actual
-  if (productVariants.length > 0) {
-    const productLines = productVariants.map((v, i) => {
-      const availability = formatAvailabilityPhrase(v, rules.delivery_time_labels);
-      let line =
-        `${i + 1}. ${v.product.marca} ${v.product.modelo} — ${v.color} — ${v.almacenamiento}\n` +
-        `   Precio contado: ${formatPrice(v.precio)}\n` +
-        `   ${availability}`;
-
-      // Cuotas por producto — solo si hay planes activos
-      if (hasFinancing) {
-        const cuotaLabels = financingPlans
-          .filter((p) => p.installments > 1)
-          .map((p) => {
-            const total = v.precio * (1 + p.interest_rate / 100);
-            const cuota = Math.round(total / p.installments);
-            return `${p.installments}×${formatPrice(cuota)}/mes`;
-          });
-        if (cuotaLabels.length > 0) {
-          line += `\n   Cuotas tarjeta: ${cuotaLabels.join(' | ')}`;
-        }
-      }
-
-      return line;
+  // PRECIOS EN VIVO — fuente de verdad (hoja del ERP)
+  if (livePricing && livePricing.precios.length > 0) {
+    const staleWarn = livePricing.edadMinutos > 30
+      ? ` (dato de hace ${livePricing.edadMinutos} min)`
+      : '';
+    const lines = livePricing.precios.map((p) => {
+      const alm = p.almacenamiento ? ` ${p.almacenamiento}` : '';
+      return `- ${p.modelo}${alm}: contado ${formatPrice(p.precioARS)} · preventa ${formatPrice(p.preventaARS)}` +
+        (p.precioUSD ? ` · u$s ${p.precioUSD}` : '');
     });
-    sections.push(`PRODUCTOS PARA ESTA CONSULTA:\n${productLines.join('\n\n')}`);
+    sections.push(
+      `PRECIOS EN VIVO${staleWarn} — usar SOLO estos valores para contado y preventa:\n` +
+      lines.join('\n') +
+      `\nSi el cliente pide un almacenamiento que no está en esta lista → pedir el dato o data_faltante.`,
+    );
   } else {
     sections.push(
-      'PRODUCTOS: No hay variantes cargadas para esta consulta. ' +
-      'Esto NO significa que no esté disponible — asumir disponibilidad operativa. ' +
-      'Preguntar modelo, color y capacidad exactos para avanzar. ' +
-      'No prometer disponibilidad inmediata específica ni reservas. ' +
-      'Reportar en data_faltante para seguimiento interno.',
+      'PRECIOS EN VIVO: no hay precio cargado para el modelo/almacenamiento de esta consulta. ' +
+      'NO inventar ni estimar. Preguntar el modelo y el almacenamiento exactos; si ya los tenés, ' +
+      'responder "dejame confirmar el precio exacto y te aviso" y reportar en data_faltante. ' +
+      'La disponibilidad igual se asume operativa (nunca decir "no tenemos").',
     );
+  }
+
+  // Señal de stock físico (sin precio — el precio es el de PRECIOS EN VIVO)
+  if (productVariants.length > 0) {
+    const stockLines = productVariants.map(
+      (v) => `- ${v.product.modelo} ${v.almacenamiento} ${v.color}: ${formatAvailabilityPhrase(v, rules.delivery_time_labels)}`,
+    );
+    sections.push(`STOCK FÍSICO EN LOCAL (referencia de entrega, NO de precio):\n${stockLines.join('\n')}`);
   }
 
   // RAG chunks (vacío en V1 sin RAG implementado)
@@ -1023,11 +985,26 @@ function buildDynamicBlock(
     const parts = [`Modelo: ${raw.modelo_actual}`];
     if (raw.almacenamiento_actual) parts.push(raw.almacenamiento_actual);
     if (raw.estado_equipo) parts.push(`estado: ${raw.estado_equipo}`);
-    sections.push(
-      `PLAN CANJE — EQUIPO QUE ENTREGA EL CLIENTE:\n` +
-      parts.join(' · ') + '\n' +
-      'Usar la TABLA DE TOMA PLAN CANJE del system prompt para calcular el valor orientativo según las fallas que el cliente reporte.',
-    );
+
+    let canje = `PLAN CANJE — EQUIPO QUE ENTREGA EL CLIENTE:\n${parts.join(' · ')}\n`;
+    if (livePricing?.toma) {
+      const t = livePricing.toma;
+      const deds = Object.entries(t.deducciones)
+        .filter(([, v]) => v > 0)
+        .map(([parte, v]) => `${parte} −${formatPrice(v)}`)
+        .join(' · ');
+      canje +=
+        `Valor de toma EN VIVO para ${t.modelo}:\n` +
+        `- Base (impecable): ${formatPrice(t.impecable)}\n` +
+        `- Descuentos por falla: ${deds}\n` +
+        `Valor orientativo = base − (fallas que reporte el cliente). ` +
+        `La definitiva se confirma con el equipo en mano.`;
+    } else {
+      canje +=
+        'Sin valor de toma en vivo para este modelo. Pedir modelo, almacenamiento y estado; ' +
+        'no dar número, decir que la valuación se confirma con el equipo en el local.';
+    }
+    sections.push(canje);
   }
 
   return sections.join('\n\n─────────────────────────────────\n\n');
@@ -1042,7 +1019,7 @@ function buildDynamicBlock(
  * Aplica prompt caching en el bloque estático y en la memoria del cliente.
  */
 export function buildPrompt(context: AgentContext): BuiltPrompt {
-  const { lead, memory, history, productVariants, ragChunks, rules, userMessage } = context;
+  const { lead, memory, history, productVariants, ragChunks, rules, userMessage, livePricing } = context;
 
   const system: CacheableTextBlock[] = [
     {
@@ -1057,7 +1034,7 @@ export function buildPrompt(context: AgentContext): BuiltPrompt {
     },
     {
       type: 'text',
-      text: buildDynamicBlock(lead, memory, productVariants, ragChunks, rules),
+      text: buildDynamicBlock(lead, memory, productVariants, ragChunks, rules, livePricing),
     },
   ];
 
