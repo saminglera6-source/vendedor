@@ -53,25 +53,46 @@ export function createGeminiProvider(): LlmProvider {
           parts: [{ text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }],
         }));
 
-        const res = await client().models.generateContent({
-          model,
-          contents,
-          config: {
-            systemInstruction: systemText,
-            responseMimeType: 'application/json',
-            temperature: 0.7,
-            maxOutputTokens: 900,
-          },
-        });
+        // Reintentos ante 503/UNAVAILABLE (modelo sobrecargado) y 429.
+        let res;
+        let lastErr: unknown;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            res = await client().models.generateContent({
+              model,
+              contents,
+              config: {
+                systemInstruction: systemText,
+                responseMimeType: 'application/json',
+                temperature: 0.7,
+                maxOutputTokens: 4096,
+              },
+            });
+            break;
+          } catch (e) {
+            lastErr = e;
+            const msg = e instanceof Error ? e.message : String(e);
+            if (!/503|429|UNAVAILABLE|overloaded|high demand/i.test(msg)) throw e;
+            await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+          }
+        }
+        if (!res) throw lastErr;
 
+        const finish = res.candidates?.[0]?.finishReason;
         const raw = stripFences(res.text ?? '');
-        if (!raw) return err(new AgentError('Gemini devolvió respuesta vacía', { model }));
+        if (!raw) {
+          return err(new AgentError('Gemini devolvió respuesta vacía', { model, finish }));
+        }
 
         let parsed: unknown;
         try {
           parsed = JSON.parse(raw);
         } catch {
-          return err(new AgentError('Gemini devolvió JSON inválido', { model, raw: raw.slice(0, 400) }));
+          return err(new AgentError('Gemini devolvió JSON inválido', {
+            model,
+            finish,
+            raw: raw.slice(0, 500),
+          }));
         }
         return ok(parsed as Record<string, unknown>);
       } catch (error) {
