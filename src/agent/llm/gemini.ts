@@ -17,9 +17,14 @@ import { GoogleGenAI } from '@google/genai';
 // Timeout corto a propósito: si Gemini está lento, cortamos y decide el orquestador.
 const REQUEST_TIMEOUT_MS = Number(process.env['GEMINI_TIMEOUT_MS'] ?? 15_000);
 
-/** ¿El error es por saturación de Gemini (temporal, vale la pena reintentar)? */
+/**
+ * ¿El error es por saturación TEMPORAL de Gemini (vale la pena esperar)?
+ * Un 429 por "quota exceeded" / "billing" es el límite diario del free tier
+ * — esperar no lo arregla → NO cuenta como saturación (que caiga al fallback).
+ */
 export function isGeminiSaturation(msg: string): boolean {
-  return /\b503\b|\b429\b|UNAVAILABLE|overloaded|high demand|timed?\s*out|abort|ETIMEDOUT|RESOURCE_EXHAUSTED/i.test(msg);
+  if (/quota|billing|plan\s+and\s+billing|check\s+your\s+plan/i.test(msg)) return false;
+  return /\b503\b|\b504\b|\b429\b|UNAVAILABLE|overloaded|high demand|timed?\s*out|abort|ETIMEDOUT|deadline/i.test(msg);
 }
 import { ok, err, AgentError, type Result } from '../../types.js';
 import type { BuiltPrompt } from '../prompt.js';
