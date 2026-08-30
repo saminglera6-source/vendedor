@@ -101,7 +101,7 @@ function getAnthropicClient(): Anthropic {
   return _anthropic;
 }
 
-const AGENT_MODEL = process.env['AGENT_MODEL'] ?? 'claude-sonnet-4-6';
+const AGENT_MODEL = process.env['AGENT_MODEL'] ?? 'claude-haiku-4-5';
 
 // ===========================================================================
 // Helpers de estado
@@ -137,7 +137,7 @@ async function callClaude(
 
     const response = await client.messages.create({
       model: AGENT_MODEL,
-      max_tokens: 1024,
+      max_tokens: 768,
       // Los tipos de system y tools usan intersecciones locales para cache_control.
       // El cast es seguro: la API acepta cache_control vía beta header.
       system: system as Anthropic.TextBlockParam[],
@@ -199,7 +199,7 @@ export async function processMessage(
   const memory = memoryResult.ok ? memoryResult.value : null;
 
   // ─── Paso 4: Historial (fallo no bloquea) ────────────────────────────────
-  const historyResult = await getHistoryForPrompt(lead.id, 20);
+  const historyResult = await getHistoryForPrompt(lead.id, 14);
   const history = historyResult.ok ? historyResult.value : [];
 
   // ─── Paso 5: RAG — embed + búsqueda vectorial ────────────────────────────
@@ -211,7 +211,7 @@ export async function processMessage(
     if (embeddingResult.ok) {
       // Más ejemplos y umbral algo más laxo: el RAG acá se usa sobre todo
       // para calcar el estilo real, no solo para datos puntuales.
-      const ragTopK = Math.max(rules.rag_top_k.value ?? 8, 8);
+      const ragTopK = Math.max(rules.rag_top_k.value ?? 4, 4);
       const ragThreshold = Math.min(rules.rag_top_k.threshold ?? 0.7, 0.72);
       const searchResult = await searchSimilar(embeddingResult.value, {
         topK: ragTopK,
