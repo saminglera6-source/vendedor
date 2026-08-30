@@ -12,20 +12,45 @@ import type { LlmProvider } from './provider.js';
 import { createAnthropicProvider } from './anthropic.js';
 import { createGeminiProvider } from './gemini.js';
 
-let _provider: LlmProvider | null = null;
+let _primary: LlmProvider | null = null;
+let _fallback: LlmProvider | null | undefined = undefined;
+
+function makeProvider(name: string): LlmProvider {
+  return name === 'gemini' ? createGeminiProvider() : createAnthropicProvider();
+}
 
 export function getProvider(): LlmProvider {
-  if (_provider) return _provider;
+  if (_primary) return _primary;
   const name = (process.env['LLM_PROVIDER'] ?? 'anthropic').toLowerCase();
-  _provider =
-    name === 'gemini' ? createGeminiProvider() : createAnthropicProvider();
-  console.info(`[llm] proveedor: ${_provider.name}`);
-  return _provider;
+  _primary = makeProvider(name);
+  console.info(`[llm] proveedor: ${_primary.name}`);
+  return _primary;
+}
+
+/**
+ * Proveedor de respaldo: el "otro" (si su key está configurada).
+ * Se usa solo si el primario falla — para no depender de un solo servicio.
+ */
+function getFallback(): LlmProvider | null {
+  if (_fallback !== undefined) return _fallback;
+  const primaryName = (process.env['LLM_PROVIDER'] ?? 'anthropic').toLowerCase();
+  if (process.env['LLM_FALLBACK'] === 'off') {
+    _fallback = null;
+  } else if (primaryName === 'gemini' && process.env['ANTHROPIC_API_KEY']) {
+    _fallback = makeProvider('anthropic');
+  } else if (primaryName !== 'gemini' && process.env['GEMINI_API_KEY']) {
+    _fallback = makeProvider('gemini');
+  } else {
+    _fallback = null;
+  }
+  if (_fallback) console.info(`[llm] fallback disponible: ${_fallback.name}`);
+  return _fallback;
 }
 
 /** Solo para tests / cambios en caliente. */
 export function resetProvider(): void {
-  _provider = null;
+  _primary = null;
+  _fallback = undefined;
 }
 
 /**
@@ -36,14 +61,28 @@ export async function generateAgentResponse(
   context: AgentContext,
 ): Promise<Result<AgentResponse>> {
   const prompt = buildPrompt(context);
-  const raw = await getProvider().complete(prompt);
-  if (!raw.ok) return err(raw.error);
 
-  const parsed = AgentResponseSchema.safeParse(raw.value);
-  if (!parsed.success) {
-    return err(new AgentError('Respuesta del LLM no cumple el esquema', {
-      issues: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
-    }));
+  const tryProvider = async (p: LlmProvider): Promise<Result<AgentResponse>> => {
+    const raw = await p.complete(prompt);
+    if (!raw.ok) return err(raw.error);
+    const parsed = AgentResponseSchema.safeParse(raw.value);
+    if (!parsed.success) {
+      return err(new AgentError(`Respuesta de ${p.name} no cumple el esquema`, {
+        issues: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+      }));
+    }
+    return ok(parsed.data as AgentResponse);
+  };
+
+  const primary = await tryProvider(getProvider());
+  if (primary.ok) return primary;
+
+  const fallback = getFallback();
+  if (fallback) {
+    console.warn(`[llm] primario falló (${primary.error.message.slice(0, 120)}) → probando ${fallback.name}`);
+    const alt = await tryProvider(fallback);
+    if (alt.ok) return alt;
+    console.error(`[llm] fallback también falló: ${alt.error.message.slice(0, 120)}`);
   }
-  return ok(parsed.data as AgentResponse);
+  return primary;
 }
