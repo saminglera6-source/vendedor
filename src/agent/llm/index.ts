@@ -10,7 +10,25 @@ import { buildPrompt } from '../prompt.js';
 import { AgentResponseSchema } from '../parser.js';
 import type { LlmProvider } from './provider.js';
 import { createAnthropicProvider } from './anthropic.js';
-import { createGeminiProvider } from './gemini.js';
+import { createGeminiProvider, isGeminiSaturation } from './gemini.js';
+
+// ── Estrategia de espera cuando Gemini está saturado (503) ──────────────────
+// Para leads poco interesados conviene esperar a que Gemini se libere (es más
+// barato). Para leads calientes, caer rápido a Anthropic y no perder la venta.
+const INTEREST_THRESHOLD = Number(process.env['LLM_INTEREST_THRESHOLD'] ?? 40);
+const WAIT_LOW_MS = Number(process.env['LLM_GEMINI_WAIT_LOW_MS'] ?? 30 * 60_000);  // 30 min
+const WAIT_HIGH_MS = Number(process.env['LLM_GEMINI_WAIT_HIGH_MS'] ?? 5 * 60_000); //  5 min
+const RETRY_EVERY_MS = Number(process.env['LLM_GEMINI_RETRY_EVERY_MS'] ?? 45_000);
+
+export interface GenerateOpts {
+  /** Score de interés del lead (0-100). Decide cuánto esperar a Gemini. */
+  interestScore?: number;
+  /**
+   * true (WhatsApp/Kommo): se puede esperar minutos a que Gemini se libere.
+   * false (API directa / simulador): fallback inmediato, sin esperas largas.
+   */
+  patient?: boolean;
+}
 
 let _primary: LlmProvider | null = null;
 let _fallback: LlmProvider | null | undefined = undefined;
@@ -59,6 +77,7 @@ export function resetProvider(): void {
  */
 export async function generateAgentResponse(
   context: AgentContext,
+  opts: GenerateOpts = {},
 ): Promise<Result<AgentResponse>> {
   const prompt = buildPrompt(context);
 
@@ -88,15 +107,39 @@ export async function generateAgentResponse(
     return ok(r);
   };
 
-  const primary = await tryProvider(getProvider());
-  if (primary.ok) return primary;
-
+  const provider = getProvider();
   const fallback = getFallback();
+  const isGemini = provider.name.startsWith('gemini:');
+
+  let last = await tryProvider(provider);
+  if (last.ok) return last;
+
+  // Si el primario es Gemini y está SATURADO (no un error real), reintentar
+  // según la paciencia permitida por el interés del lead.
+  if (isGemini && opts.patient && isGeminiSaturation(last.error.message)) {
+    const score = opts.interestScore ?? 0;
+    const budget = score >= INTEREST_THRESHOLD ? WAIT_HIGH_MS : WAIT_LOW_MS;
+    const deadline = Date.now() + budget;
+    console.warn(`[llm] Gemini saturado · lead score ${score} → espero hasta ${Math.round(budget / 60000)} min`);
+
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, RETRY_EVERY_MS));
+      last = await tryProvider(provider);
+      if (last.ok) {
+        console.info('[llm] Gemini se liberó, respondió');
+        return last;
+      }
+      if (!isGeminiSaturation(last.error.message)) break; // error real → cortar
+    }
+    console.warn('[llm] se agotó la espera de Gemini → fallback');
+  }
+
+  // Fallback al otro proveedor
   if (fallback) {
-    console.warn(`[llm] primario falló (${primary.error.message.slice(0, 120)}) → probando ${fallback.name}`);
+    console.warn(`[llm] ${provider.name} falló (${last.error.message.slice(0, 100)}) → ${fallback.name}`);
     const alt = await tryProvider(fallback);
     if (alt.ok) return alt;
-    console.error(`[llm] fallback también falló: ${alt.error.message.slice(0, 120)}`);
+    console.error(`[llm] fallback también falló: ${alt.error.message.slice(0, 100)}`);
   }
-  return primary;
+  return last;
 }

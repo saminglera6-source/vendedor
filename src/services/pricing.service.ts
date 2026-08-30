@@ -251,15 +251,21 @@ export function calcularCuotas(
     });
 }
 
+// Cada regex exige el nombre de la parte JUNTO a un indicio de daño — la
+// palabra sola ("pantalla ok", "cámara buena") NO cuenta como falla.
+const DANO = 'rota\\w*|rajad\\w*|quebrad\\w*|fisurad\\w*|trizad\\w*|rot[oa]s?|no\\s+anda|no\\s+funciona|fallad\\w*|con\\s+detalle|manch\\w*|golpe\\w*|no\\s+enfoca|empañad\\w*|para\\s+cambiar|hay\\s+que\\s+cambiar';
+const near = (parte: string) =>
+  new RegExp(`\\b(${parte})\\b.{0,25}?\\b(${DANO})|\\b(${DANO})\\b.{0,25}?\\b(${parte})`, 'i');
+
 const FALLA_KEYWORDS: Array<[keyof TomaRow, RegExp]> = [
-  ['pantalla', /\b(pantalla|display|rajad|rota|quebrad|fisurad|trizad|manchas?\s+en\s+la\s+pantalla|pixel)/i],
-  ['bateria', /\b(bater[ií]a\s+(mala|gastada|baja|para\s+cambiar)|salud\s+de\s+bater[ií]a\s+baj|cambiar\s+la\s+bater[ií]a)/i],
-  ['camara', /\b(c[aá]mara\s+(rota|fallada|con\s+manchas|empañad|no\s+enfoca)|manchas?\s+en\s+la\s+c[aá]mara)/i],
-  ['microfono', /\b(micr[oó]fono|no\s+se\s+escucha\s+cuando\s+hablo|no\s+me\s+escuchan)/i],
-  ['parlante', /\b(parlante|altavoz|auricular\s+de\s+llamada|no\s+se\s+escucha\s+el\s+audio)/i],
-  ['tapa', /\b(tapa\s+(trasera|de\s+atr[aá]s)\s+(rota|rajad|quebrad)|vidrio\s+de\s+atr[aá]s\s+roto)/i],
-  ['marco', /\b(marco\s+(golpead|abollad|doblad)|chasis\s+golpead|golpes?\s+en\s+el\s+marco|abollad)/i],
-  ['pin', /\b(pin\s+de\s+carga|no\s+carga\s+bien|puerto\s+de\s+carga|conector\s+de\s+carga)/i],
+  ['pantalla', new RegExp(`${near('pantalla|display').source}|pantalla\\s+(rota|rajad|quebrad|trizad|fisurad)|manchas?\\s+en\\s+la\\s+pantalla|pixel(es)?\\s+muert`, 'i')],
+  ['bateria', /\bbater[ií]a\s+(mala|gastada|muy\s+baja|para\s+cambiar)\b|hay\s+que\s+cambiar\s+la\s+bater[ií]a|salud\s+de\s+bater[ií]a\s+(muy\s+)?baj/i],
+  ['camara', new RegExp(`${near('c[aá]mara').source}|c[aá]mara\\s+(rota|fallada|empañad|no\\s+enfoca|con\\s+manchas)|manchas?\\s+en\\s+la\\s+c[aá]mara`, 'i')],
+  ['microfono', /\bmicr[oó]fono\s+(roto|no\s+anda|no\s+funciona|fallad)|no\s+se\s+escucha\s+cuando\s+hablo|no\s+me\s+escuchan\s+(en\s+)?llamad/i],
+  ['parlante', /\bparlante\s+(roto|no\s+anda|no\s+funciona|fallad)|altavoz\s+(roto|no\s+anda)|no\s+se\s+escucha\s+el\s+audio/i],
+  ['tapa', /\b(tapa\s+(trasera|de\s+atr[aá]s)|vidrio\s+de\s+atr[aá]s)\s+(rota|rajad|quebrad|trizad|fisurad|roto)/i],
+  ['marco', /\b(marco|chasis)\s+(golpead|abollad|doblad)|golpes?\s+en\s+el\s+(marco|borde|canto)|abollad/i],
+  ['pin', /\bpin\s+de\s+carga\s+(roto|no\s+anda|fallad)|no\s+carga\s+bien|puerto\s+de\s+carga\s+(roto|dañad)|conector\s+de\s+carga\s+(roto|flojo)/i],
 ];
 
 /** Umbral de salud de batería: por debajo, la toma descuenta el cambio de batería. */

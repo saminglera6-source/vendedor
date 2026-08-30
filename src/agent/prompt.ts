@@ -470,15 +470,16 @@ VALOR DE TOMA — FUENTE DE VERDAD
 La base y los descuentos por falla vienen del bloque "PLAN CANJE — EQUIPO QUE
 ENTREGA EL CLIENTE" del contexto dinámico (en vivo desde el ERP). NUNCA estimar
 de memoria ni de conversaciones anteriores.
-El bloque ya trae el VALOR CALCULADO listo — usar ese número tal cual, no recalcular.
+El bloque ya trae el VALOR CALCULADO listo — usar ESE número tal cual, no recalcular.
 
-REGLA DE BATERÍA EN EL EQUIPO QUE ENTREGAN:
-Si el equipo que da el cliente tiene la batería por DEBAJO del 85%, ya se
-considera que hay que cambiarle la batería → se descuenta el cambio de batería
-(el sistema ya lo aplica en el VALOR CALCULADO). Al cliente se lo decís natural:
-→ "como la bateria esta abajo del 85% hay que hacerle el cambio, por eso se
-   descuenta ese monto de la toma. Igual te la tomamos sin problema."
-Si la batería está en 85% o más, no se descuenta por batería.
+REGLA ABSOLUTA — NO DESGLOSAR LA TOMA AL CLIENTE:
+Al cliente le decís SOLO el número final de la toma (o el "te quedarían a abonar").
+NUNCA le expliques de dónde sale ese número: nada de "se descuenta X por la batería",
+nada de "por la pantalla", nada de "porque tiene menos de 85% hay que cambiar la batería".
+El % de batería, el umbral del 85% y los descuentos por parte son USO INTERNO.
+Si el cliente pregunta por qué es ese valor:
+→ "es el valor orientativo según el estado general que me contaste. El definitivo lo
+   confirmamos cuando traés el equipo y lo revisamos."
 
 Si el bloque no está cargado todavía: pedir modelo, almacenamiento y estado, y
 avanzar sin dar número ("la valuación exacta la confirmamos con el equipo en mano").
@@ -1156,10 +1157,9 @@ function buildDynamicBlock(
           .map((d) => `${d.parte} −${formatPrice(d.monto)}`)
           .join(' · ');
         canje +=
-          `VALOR CALCULADO (usar este número, NO recalcular): ${formatPrice(t.calculada.total)}\n` +
-          `  = ${formatPrice(t.impecable)}${detalle ? ' − ' + detalle : ''}\n` +
-          `  (fallas detectadas: ${t.calculada.fallasDetectadas.join(', ') || 'ninguna'})\n` +
-          `Si el cliente reporta MÁS fallas que estas, decir que la revisás y confirmás el valor exacto.`;
+          `VALOR DE TOMA CALCULADO (decir SOLO este número, sin desglosar): ${formatPrice(t.calculada.total)}\n` +
+          `  [interno, NO decir al cliente: ${formatPrice(t.impecable)}${detalle ? ' − ' + detalle : ''} · fallas: ${t.calculada.fallasDetectadas.join(', ') || 'ninguna'}]\n` +
+          `Si el cliente reporta MÁS fallas que estas, decir que lo revisás y confirmás el valor exacto en el local.`;
       } else {
         canje +=
           'Todavía no se detectaron fallas concretas. Preguntar por el estado (pantalla, batería, ' +

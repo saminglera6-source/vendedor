@@ -118,7 +118,7 @@ export const CHAT_SIM_HTML = /* html */ `<!doctype html>
       const r = await fetch('/message', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ phone, message: text, channel:'whatsapp' })
+        body: JSON.stringify({ phone, message: text, channel:'web' })
       });
       const j = await r.json();
       if(!j.ok){ typing.style.display = 'none'; addBubble('⚠️ error: ' + (j.error?.message || 'desconocido'), 'in'); return; }

@@ -14,8 +14,13 @@
 
 import { GoogleGenAI } from '@google/genai';
 
-// Timeout corto a propósito: si Gemini está lento, mejor caer rápido al fallback.
-const REQUEST_TIMEOUT_MS = Number(process.env['GEMINI_TIMEOUT_MS'] ?? 13_000);
+// Timeout corto a propósito: si Gemini está lento, cortamos y decide el orquestador.
+const REQUEST_TIMEOUT_MS = Number(process.env['GEMINI_TIMEOUT_MS'] ?? 15_000);
+
+/** ¿El error es por saturación de Gemini (temporal, vale la pena reintentar)? */
+export function isGeminiSaturation(msg: string): boolean {
+  return /\b503\b|\b429\b|UNAVAILABLE|overloaded|high demand|timed?\s*out|abort|ETIMEDOUT|RESOURCE_EXHAUSTED/i.test(msg);
+}
 import { ok, err, AgentError, type Result } from '../../types.js';
 import type { BuiltPrompt } from '../prompt.js';
 import { type LlmProvider, JSON_CONTRACT } from './provider.js';
@@ -56,35 +61,20 @@ export function createGeminiProvider(): LlmProvider {
           parts: [{ text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }],
         }));
 
-        // 1 reintento rápido solo para 503/429 instantáneos; si Gemini está
-        // lento (timeout), no insistimos — que el fallback (Haiku) tome la posta.
-        let res;
-        let lastErr: unknown;
-        for (let attempt = 0; attempt < 2; attempt++) {
-          try {
-            res = await client().models.generateContent({
-              model,
-              contents,
-              config: {
-                systemInstruction: systemText,
-                responseMimeType: 'application/json',
-                temperature: 0.7,
-                maxOutputTokens: 4096,
-                abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-                httpOptions: { timeout: REQUEST_TIMEOUT_MS },
-              },
-            });
-            break;
-          } catch (e) {
-            lastErr = e;
-            const msg = e instanceof Error ? e.message : String(e);
-            const isSlow = /timed?\s*out|abort|ETIMEDOUT/i.test(msg);
-            const isOverload = /503|429|UNAVAILABLE|overloaded|high demand/i.test(msg);
-            if (isSlow || !isOverload) throw e; // lento o error real → cortar ya
-            await new Promise((r) => setTimeout(r, 500));
-          }
-        }
-        if (!res) throw lastErr;
+        // Un solo intento con timeout corto. La estrategia de reintentos/espera
+        // (según interés del lead) la maneja generateAgentResponse.
+        const res = await client().models.generateContent({
+          model,
+          contents,
+          config: {
+            systemInstruction: systemText,
+            responseMimeType: 'application/json',
+            temperature: 0.7,
+            maxOutputTokens: 4096,
+            abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+            httpOptions: { timeout: REQUEST_TIMEOUT_MS },
+          },
+        });
 
         const finish = res.candidates?.[0]?.finishReason;
         const raw = stripFences(res.text ?? '');

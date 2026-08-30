@@ -297,7 +297,12 @@ export async function processMessage(
   };
 
   // ─── Paso 9: Llamar al LLM (proveedor según LLM_PROVIDER) ────────────────
-  const llmResult = await generateAgentResponse(context);
+  // Interés estimado (antes de la respuesta): score guardado vs evaluación del turno.
+  const interestScore = Math.max(lead.lead_score, assessment.newScore);
+  // 'web' = API directa / simulador (sin esperas largas). Otros = WhatsApp/IG por Kommo.
+  const llmOpts = { interestScore, patient: channel !== 'web' };
+
+  const llmResult = await generateAgentResponse(context, llmOpts);
   if (!llmResult.ok) return err(llmResult.error);
 
   let agentResponse = llmResult.value;
@@ -345,7 +350,8 @@ export async function processMessage(
       userMessage: message,
     };
 
-    const retryResult = await generateAgentResponse(retryContext);
+    // El reintento por lenguaje no espera largo a Gemini (ya hay una respuesta).
+    const retryResult = await generateAgentResponse(retryContext, { ...llmOpts, patient: false });
     if (retryResult.ok) {
       const retryGuard = checkLanguage(retryResult.value.respuesta, rules.prohibited_phrases);
       if (retryGuard.passed) {
