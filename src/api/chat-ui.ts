@@ -102,7 +102,9 @@ export const CHAT_SIM_HTML = /* html */ `<!doctype html>
     pending.push(text);
     clearTimeout(debounceTimer);
     // En modo real: esperar ~10s por si mandás otro mensaje. En modo rápido: al toque.
-    debounceTimer = setTimeout(fireTurn, rtBox.checked ? DEBOUNCE_MS : 150);
+    // El debounce va SIEMPRE (así podés mandar la consulta en varios mensajes);
+    // "tiempos reales" solo cambia cuánto espera y las pausas de tipeo.
+    debounceTimer = setTimeout(fireTurn, rtBox.checked ? DEBOUNCE_MS : 3000);
     typing.style.display = rtBox.checked ? 'none' : 'block';
   }
 

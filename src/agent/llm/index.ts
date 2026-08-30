@@ -65,13 +65,27 @@ export async function generateAgentResponse(
   const tryProvider = async (p: LlmProvider): Promise<Result<AgentResponse>> => {
     const raw = await p.complete(prompt);
     if (!raw.ok) return err(raw.error);
+
     const parsed = AgentResponseSchema.safeParse(raw.value);
     if (!parsed.success) {
-      return err(new AgentError(`Respuesta de ${p.name} no cumple el esquema`, {
-        issues: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
-      }));
+      console.error(`[llm] ${p.name} salida inválida:`,
+        parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(' · '),
+        '\nraw:', JSON.stringify(raw.value).slice(0, 600));
+      return err(new AgentError(`Respuesta de ${p.name} no cumple el esquema`, {}));
     }
-    return ok(parsed.data as AgentResponse);
+
+    const r = parsed.data as AgentResponse;
+    // Sin respuesta y sin derivación explícita = el modelo falló en serio.
+    if (!r.respuesta.trim() && !r.fragmentos?.length && !r.pasar_a_humano) {
+      console.error(`[llm] ${p.name} devolvió respuesta vacía sin pasar_a_humano. raw:`,
+        JSON.stringify(raw.value).slice(0, 600));
+      return err(new AgentError(`Respuesta de ${p.name} vacía`, {}));
+    }
+    // Coherencia: si hay fragmentos, respuesta = fragmentos unidos
+    if (r.fragmentos?.length && r.respuesta.trim() !== r.fragmentos.join('\n\n').trim()) {
+      r.respuesta = r.fragmentos.join('\n\n');
+    }
+    return ok(r);
   };
 
   const primary = await tryProvider(getProvider());

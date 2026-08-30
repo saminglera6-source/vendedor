@@ -31,6 +31,15 @@ import {
  * El orden importa: "16 pro max" debe matchear antes que "16 pro".
  */
 const MODEL_ALIASES: ReadonlyArray<[pattern: string, canonical: string]> = [
+  // ── iPhone 17 ──────────────────────────────────────────────────────────
+  ['iphone 17 pro max', 'iPhone 17 Pro Max'],
+  ['17 pro maxi',       'iPhone 17 Pro Max'],
+  ['17 pro max',        'iPhone 17 Pro Max'],
+  ['iphone 17 pro',     'iPhone 17 Pro'],
+  ['17 pro',            'iPhone 17 Pro'],
+  ['iphone 17 plus',    'iPhone 17 Plus'],
+  ['17 plus',           'iPhone 17 Plus'],
+  ['iphone 17',         'iPhone 17'],
   // ── iPhone 16 ──────────────────────────────────────────────────────────
   ['iphone 16 pro max', 'iPhone 16 Pro Max'],
   ['16 pro maxi',       'iPhone 16 Pro Max'],

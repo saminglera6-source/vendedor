@@ -470,8 +470,17 @@ VALOR DE TOMA — FUENTE DE VERDAD
 La base y los descuentos por falla vienen del bloque "PLAN CANJE — EQUIPO QUE
 ENTREGA EL CLIENTE" del contexto dinámico (en vivo desde el ERP). NUNCA estimar
 de memoria ni de conversaciones anteriores.
-Cálculo: valor orientativo = base − suma de descuentos de las fallas que reporta el cliente.
-Si ese bloque no está cargado todavía: pedir modelo, almacenamiento y estado, y
+El bloque ya trae el VALOR CALCULADO listo — usar ese número tal cual, no recalcular.
+
+REGLA DE BATERÍA EN EL EQUIPO QUE ENTREGAN:
+Si el equipo que da el cliente tiene la batería por DEBAJO del 85%, ya se
+considera que hay que cambiarle la batería → se descuenta el cambio de batería
+(el sistema ya lo aplica en el VALOR CALCULADO). Al cliente se lo decís natural:
+→ "como la bateria esta abajo del 85% hay que hacerle el cambio, por eso se
+   descuenta ese monto de la toma. Igual te la tomamos sin problema."
+Si la batería está en 85% o más, no se descuenta por batería.
+
+Si el bloque no está cargado todavía: pedir modelo, almacenamiento y estado, y
 avanzar sin dar número ("la valuación exacta la confirmamos con el equipo en mano").
 
 Estos datos se registran en memoria del cliente: modelo_actual, almacenamiento_actual, estado_equipo.

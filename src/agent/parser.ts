@@ -29,60 +29,72 @@ const CustomerMemoryPatchSchema = z
     almacenamiento: z.string().optional(),
     presupuesto_min: z.number().nonnegative().optional(),
     presupuesto_max: z.number().nonnegative().optional(),
-    // ISO date YYYY-MM-DD
     fecha_estimada_compra: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha debe ser YYYY-MM-DD')
       .optional(),
     resumen_comercial: z.string().max(1000).optional(),
   })
-  .strict(); // rechazar campos extra inesperados
+  // Sin .strict(): los modelos chicos a veces agregan campos de más — Zod los
+  // descarta silenciosamente en vez de tirar todo el turno.
+  ;
+
+const CoerceBool = z.union([
+  z.boolean(),
+  z.string().transform((s) => /^(true|1|si|sí|yes)$/i.test(s.trim())),
+  z.null().transform(() => false),
+]);
 
 export const AgentResponseSchema = z
   .object({
     respuesta: z
       .string()
-      .max(2000, 'respuesta demasiado larga para WhatsApp'),
+      .max(2000, 'respuesta demasiado larga para WhatsApp')
+      .catch(''),
 
-    fragmentos: z
-      .array(z.string().min(1).max(700))
-      .min(2, 'fragmentos debe tener al menos 2 elementos si no es null')
-      .max(3, 'fragmentos no puede tener más de 3 elementos')
-      .nullable(),
+    // Preprocesado: un array de <2 elementos no tiene sentido como fragmentos
+    // (se manda un solo mensaje) → null. Más de 3 → recortar. Filtrar vacíos.
+    fragmentos: z.preprocess((v) => {
+      if (!Array.isArray(v)) return null;
+      const cleaned = v.filter((x) => typeof x === 'string' && x.trim()).map((x) => (x as string).slice(0, 700));
+      if (cleaned.length < 2) return null;
+      return cleaned.slice(0, 3);
+    }, z.array(z.string()).nullable()),
 
     lead_score: z
-      .number()
-      .min(0)
-      .max(100)
-      .transform(Math.round), // clampear a entero por seguridad
+      .coerce.number()
+      .catch(0)
+      .transform((n) => Math.min(100, Math.max(0, Math.round(n)))),
 
     estado: z.enum([
       'NEW', 'CONSULTA', 'INTERESADO', 'MUY_INTERESADO',
       'LISTO_PARA_COMPRAR', 'CLIENTE', 'PERDIDO',
-    ]),
+    ]).catch('CONSULTA'),
 
     intencion: z.enum([
       'consulta', 'disponibilidad', 'precio', 'comparacion',
       'compra', 'objecion', 'queja', 'saludo', 'otro',
-    ]),
+    ]).catch('otro'),
 
     accion_venta: z.enum([
       'pregunta_variante', 'pregunta_ciudad', 'pregunta_presupuesto', 'pregunta_uso',
       'precio_dado', 'disponibilidad_dada', 'alternativa_ofrecida', 'objecion_resuelta',
       'visita_propuesta', 'cierre_propuesto', 'seguimiento_creado', 'derivacion_humano', 'solo_respondio',
-    ]),
+    ]).catch('solo_respondio'),
 
-    requiere_humano: z.boolean(),
+    requiere_humano: CoerceBool.catch(false),
 
-    pasar_a_humano: z.boolean().default(false),
+    pasar_a_humano: CoerceBool.catch(false),
 
-    followup: FollowupSpecSchema.nullable(),
+    followup: FollowupSpecSchema.nullable().catch(null),
 
-    data_faltante: z.array(z.string().min(1)).nullable(),
+    data_faltante: z.preprocess(
+      (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string' && x.trim()) : v),
+      z.array(z.string()).nullable(),
+    ).catch(null),
 
-    memory_update: CustomerMemoryPatchSchema.nullable(),
-  })
-  .strict();
+    memory_update: CustomerMemoryPatchSchema.nullable().catch(null),
+  });
 
 /** Tipo inferido de Zod — coincide con AgentResponse de types.ts */
 export type ParsedAgentResponse = z.infer<typeof AgentResponseSchema>;

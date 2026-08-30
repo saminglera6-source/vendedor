@@ -26,7 +26,10 @@ import { createFollowup, cancelPendingFollowups } from '../db/followups.js';
 import { createAiFeedback } from '../db/ai-feedback.js';
 
 // — Services —
-import { matchFromMessage } from '../services/product-matching.service.js';
+import { matchFromMessage, normalizeModel, normalizeText } from '../services/product-matching.service.js';
+
+/** Normaliza un nombre de modelo para comparar (canónico + sin acentos). */
+const normModelo = (m: string): string => normalizeText(normalizeModel(m) ?? m);
 import {
   getPricing,
   findPrecios,
@@ -34,6 +37,7 @@ import {
   calcularCuotas,
   estimarToma,
   detectFallas,
+  detectBateriaPct,
   detectTradeIn,
   detectModelosMencionados,
 } from '../services/pricing.service.js';
@@ -176,11 +180,29 @@ export async function processMessage(
         parsed?.almacenamiento ?? memory?.almacenamiento ?? null;
 
       // Todos los modelos nombrados en el mensaje (consultas tipo "el 15 y el 16 pro"),
-      // más el de la memoria como fallback.
+      // Texto de todos los mensajes del cliente (fallas/modelo de canje pueden
+      // haberse dicho hace 2 turnos).
+      const textoCliente = [
+        ...history.filter((h) => h.role === 'user').map((h) => h.content),
+        message,
+      ].join('  ·  ');
+
+      // Equipo que ENTREGA el cliente — se resuelve primero para no cotizarlo
+      // como si fuera el que quiere comprar. detectTradeIn (sobre el segmento
+      // de la frase de permuta) es más confiable que el valor de memoria.
+      const tradeIn = detectTradeIn(textoCliente);
+      const modeloTomaRaw =
+        tradeIn?.modelo ?? memory?.raw_preferences?.modelo_actual ?? null;
+
+      // Modelos que el cliente QUIERE (nombrados en el mensaje o en memoria),
+      // excluyendo el que entrega en parte de pago.
       const modelosMsg = detectModelosMencionados(message);
-      const modelosConsulta = modelosMsg.length > 0
+      const candidatos = modelosMsg.length > 0
         ? modelosMsg
         : [parsed?.modeloNormalizado ?? memory?.producto_interes].filter((x): x is string => !!x);
+      const modelosConsulta = candidatos.filter(
+        (m) => !modeloTomaRaw || normModelo(m) !== normModelo(modeloTomaRaw),
+      );
 
       const preciosRaw = modelosConsulta.flatMap((mod) =>
         findPrecios(data, mod, modelosConsulta.length > 1 ? null : almacenamientoConsulta),
@@ -210,21 +232,20 @@ export async function processMessage(
             })),
         }));
 
-      // Texto de todos los mensajes del cliente en esta conversación
-      // (una falla o el modelo de canje puede haberse dicho hace 2 turnos).
-      const textoCliente = [
-        ...history.filter((h) => h.role === 'user').map((h) => h.content),
-        message,
-      ].join('  ·  ');
-
-      // Equipo a entregar: memoria si ya lo tiene, si no detectarlo del texto.
-      const tradeIn = detectTradeIn(textoCliente);
-      const modeloToma = memory?.raw_preferences?.modelo_actual ?? tradeIn?.modelo ?? null;
       const almToma =
-        memory?.raw_preferences?.almacenamiento_actual ?? tradeIn?.almacenamiento ?? null;
-      const tomaRow = modeloToma ? findToma(data, modeloToma, almToma) : null;
+        tradeIn?.almacenamiento ?? memory?.raw_preferences?.almacenamiento_actual ?? null;
+      const tomaRow = modeloTomaRaw ? findToma(data, modeloTomaRaw, almToma) : null;
 
-      const fallas = detectFallas(`${textoCliente}  ·  ${memory?.raw_preferences?.estado_equipo ?? ''}`);
+      // Batería del equipo a entregar: <85% ya cuenta como cambio de batería.
+      // Si el agente ya preguntó por la batería, aceptar un % suelto como respuesta.
+      const bateriaEnContexto = /bater[ií]a/i.test(
+        textoCliente + ' ' + history.map((h) => h.content).join(' '),
+      );
+      const bateriaPct = detectBateriaPct(textoCliente, bateriaEnContexto);
+      const fallas = detectFallas(
+        `${textoCliente}  ·  ${memory?.raw_preferences?.estado_equipo ?? ''}`,
+        bateriaPct,
+      );
       const tomaCalc = tomaRow && fallas.length > 0 ? estimarToma(tomaRow, fallas) : null;
 
       if (precios.length > 0 || tomaRow) {

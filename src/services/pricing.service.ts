@@ -262,20 +262,59 @@ const FALLA_KEYWORDS: Array<[keyof TomaRow, RegExp]> = [
   ['pin', /\b(pin\s+de\s+carga|no\s+carga\s+bien|puerto\s+de\s+carga|conector\s+de\s+carga)/i],
 ];
 
-/** Detecta fallas mencionadas en texto libre. Devuelve el set de claves de TomaRow. */
-export function detectFallas(text: string): Array<keyof TomaRow> {
-  const found: Array<keyof TomaRow> = [];
-  for (const [key, rx] of FALLA_KEYWORDS) {
-    if (rx.test(text)) found.push(key);
+/** Umbral de salud de batería: por debajo, la toma descuenta el cambio de batería. */
+export const BATERIA_MIN_PCT = 85;
+
+/**
+ * Extrae el porcentaje de batería mencionado en texto.
+ * @param text texto a analizar (mensajes del cliente)
+ * @param allowBare si true, también acepta un porcentaje suelto ("88%", "88")
+ *        — usar solo cuando el contexto ya es de batería (el agente la preguntó).
+ */
+export function detectBateriaPct(text: string, allowBare = false): number | null {
+  const t = text.toLowerCase();
+  const patterns = [
+    /bater[ií]a\s*(?:al|en|de|:|est[aá]\s*(?:al|en)?)?\s*(\d{1,3})\s*%?/,
+    /(\d{1,3})\s*%?\s*(?:de\s+)?bater[ií]a/,
+    /salud\s*(?:de\s*(?:la\s*)?bater[ií]a)?\s*(?:al|en|de|:)?\s*(\d{1,3})/,
+  ];
+  if (allowBare) {
+    patterns.push(/(?:^|[^a-z\d])(\d{2,3})\s*%/, /(?:tiene|est[aá]|anda)\s+(?:en\s+)?(\d{2,3})\b/);
   }
-  return found;
+  for (const rx of patterns) {
+    const m = rx.exec(t);
+    if (m) {
+      const n = Number(m[1]);
+      if (n >= 1 && n <= 100) return n;
+    }
+  }
+  return null;
+}
+
+/**
+ * Detecta fallas mencionadas en texto libre. Devuelve el set de claves de TomaRow.
+ * Si se pasa `bateriaPct` y es menor a BATERIA_MIN_PCT, se agrega 'bateria'
+ * (batería por debajo del umbral = hay que cambiarla → descuenta).
+ */
+export function detectFallas(text: string, bateriaPct?: number | null): Array<keyof TomaRow> {
+  const found = new Set<keyof TomaRow>();
+  for (const [key, rx] of FALLA_KEYWORDS) {
+    if (rx.test(text)) found.add(key);
+  }
+  if (typeof bateriaPct === 'number' && bateriaPct < BATERIA_MIN_PCT) {
+    found.add('bateria');
+  }
+  return [...found];
 }
 
 // Frases que introducen el equipo que el cliente ENTREGA (no el que quiere comprar).
+// Frases que introducen el equipo que el cliente ENTREGA. "cambio MI 15" sí
+// (apunta al equipo propio); "cambiarlo por un 17" NO (apunta al que quiere).
 const PERMUTA_INTRO = new RegExp(
-  '(entrego|entregando|doy|dando|dejo|tengo)\\s+(un|una|el|la|mi)?\\s*(iphone|i ?phone|1[0-7])' +
-  '|a\\s+cuenta|parte\\s+de\\s+pago|en\\s+permuta|hacen\\s+permuta|hacen\\s+canje|de\\s+canje' +
-  '|cu[aá]nto\\s+me\\s+tom|me\\s+tom[aá]n|lo\\s+entrego|para\\s+entregar',
+  '(entrego|entregando|doy|dando|dejo|tengo|cambio|cambiar|permuto)\\s+' +
+  '(un|una|el|la|mi)\\s*(iphone|i ?phone|1[0-7]|xs|xr)' +
+  '|a\\s+cuenta|parte\\s+de\\s+pago|en\\s+permuta|hacen\\s+permuta|hacen\\s+canje|de\\s+canje|plan\\s+canje' +
+  '|cu[aá]nto\\s+me\\s+tom|me\\s+tom[aá]n|lo\\s+entrego|para\\s+entregar|el\\s+m[ií]o\\s+es',
   'i',
 );
 
@@ -287,21 +326,24 @@ const PERMUTA_INTRO = new RegExp(
 export function detectTradeIn(text: string): { modelo: string; almacenamiento: string | null } | null {
   const m = PERMUTA_INTRO.exec(text);
   if (!m) return null;
-  const segmento = text.slice(m.index);
+  // Segmento acotado: desde la frase de permuta hasta la primera coma / "por" /
+  // "queria" — así "tengo un 15 pro, quiero cambiarlo por un 17" toma el 15, no el 17.
+  const rest = text.slice(m.index);
+  const cut = rest.search(/,|\bpor\b|\bquer[ií]a\b|\bquiero\b|\bpara\b/i);
+  const segmento = cut > 8 ? rest.slice(0, cut) : rest;
 
-  // Modelo: normalizeModel primero; si falla, número suelto en el segmento.
-  let modelo = normalizeModel(segmento);
-  if (!modelo) {
-    const num = /\b(1[1-7]|xs\s*max|xr|xs|x|8\s*plus|8)\s*(pro\s*max|pro|plus|mini)?/i.exec(segmento);
-    if (num) {
-      const base = /^\d/.test(num[1]!) ? `iPhone ${num[1]}` : `iPhone ${num[1]!.toUpperCase()}`;
-      const variante = num[2] ? ` ${num[2].replace(/\s+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}` : '';
-      modelo = (base + variante).replace('Xs', 'XS').replace('Xr', 'XR');
-    }
+  // El PRIMER modelo que aparece en el segmento es el que entrega el cliente.
+  const num = /\b(1[1-7]|xs\s*max|xr|xs|x|8\s*plus|8)(?!\d)\s*(pro\s*max|pro|plus|mini)?/i.exec(segmento);
+  let modelo: string | null = null;
+  if (num) {
+    const base = /^\d/.test(num[1]!) ? `iPhone ${num[1]}` : `iPhone ${num[1]!.toUpperCase()}`;
+    const variante = num[2] ? ` ${num[2].replace(/\s+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}` : '';
+    modelo = (base + variante).replace('Xs', 'XS').replace('Xr', 'XR');
   }
+  modelo = modelo ?? normalizeModel(segmento);
   if (!modelo) return null;
 
-  return { modelo, almacenamiento: normalizeStorage(segmento) ?? normalizeStorage(text) };
+  return { modelo, almacenamiento: normalizeStorage(segmento) ?? normalizeStorage(rest) };
 }
 
 /**
