@@ -9,11 +9,9 @@
  * src/rag/embed.ts y src/rag/search.ts estén implementados.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import {
   ok,
   err,
-  AgentError,
   type Result,
   type AgentResponse,
   type LeadEstado,
@@ -43,8 +41,7 @@ import { assessLead } from '../services/lead-scoring.service.js';
 import { getOrCreate, applyPatch, regenerateResumen } from '../services/customer-memory.service.js';
 
 // — Agent layer —
-import { buildPrompt, RESPONDER_CLIENTE_TOOL } from './prompt.js';
-import { parseAgentResponse } from './parser.js';
+import { generateAgentResponse } from './llm/index.js';
 import { checkLanguage, formatViolationSummary } from './language-guard.js';
 
 // — RAG layer —
@@ -76,34 +73,6 @@ export interface ProcessMessageOutput {
 }
 
 // ===========================================================================
-// Cliente Anthropic singleton
-// ===========================================================================
-
-let _anthropic: Anthropic | null = null;
-
-function getAnthropicClient(): Anthropic {
-  if (_anthropic) return _anthropic;
-
-  const apiKey = process.env['ANTHROPIC_API_KEY'];
-  if (!apiKey) {
-    throw new AgentError(
-      'ANTHROPIC_API_KEY no definida. Verificar .env.',
-      { env: 'ANTHROPIC_API_KEY' },
-    );
-  }
-
-  _anthropic = new Anthropic({
-    apiKey,
-    // Header requerido para activar prompt caching
-    defaultHeaders: { 'anthropic-beta': 'prompt-caching-2024-07-31' },
-  });
-
-  return _anthropic;
-}
-
-const AGENT_MODEL = process.env['AGENT_MODEL'] ?? 'claude-haiku-4-5';
-
-// ===========================================================================
 // Helpers de estado
 // ===========================================================================
 
@@ -122,39 +91,6 @@ function advanceEstado(a: LeadEstado, b: LeadEstado): LeadEstado {
   const idxA = ESTADO_ORDER.indexOf(a);
   const idxB = ESTADO_ORDER.indexOf(b);
   return idxA >= idxB ? a : b;
-}
-
-// ===========================================================================
-// Llamada a Claude con manejo de errores
-// ===========================================================================
-
-async function callClaude(
-  context: AgentContext,
-): Promise<Result<Anthropic.Message>> {
-  try {
-    const { system, messages, tools } = buildPrompt(context);
-    const client = getAnthropicClient();
-
-    const response = await client.messages.create({
-      model: AGENT_MODEL,
-      max_tokens: 768,
-      // Los tipos de system y tools usan intersecciones locales para cache_control.
-      // El cast es seguro: la API acepta cache_control vía beta header.
-      system: system as Anthropic.TextBlockParam[],
-      messages,
-      tools: tools as Anthropic.Tool[],
-      tool_choice: { type: 'tool', name: RESPONDER_CLIENTE_TOOL.name },
-    });
-
-    return ok(response);
-  } catch (error) {
-    return err(
-      new AgentError(
-        `Error llamando a Claude: ${error instanceof Error ? error.message : String(error)}`,
-        { model: AGENT_MODEL, cause: String(error) },
-      ),
-    );
-  }
 }
 
 // ===========================================================================
@@ -339,14 +275,11 @@ export async function processMessage(
     livePricing,
   };
 
-  // ─── Paso 9: Llamar a Claude ─────────────────────────────────────────────
-  const claudeResult = await callClaude(context);
-  if (!claudeResult.ok) return err(claudeResult.error);
+  // ─── Paso 9: Llamar al LLM (proveedor según LLM_PROVIDER) ────────────────
+  const llmResult = await generateAgentResponse(context);
+  if (!llmResult.ok) return err(llmResult.error);
 
-  const parseResult = parseAgentResponse(claudeResult.value);
-  if (!parseResult.ok) return err(parseResult.error);
-
-  let agentResponse = parseResult.value;
+  let agentResponse = llmResult.value;
 
   // ─── Modo B: el agente decide no responder — un humano sigue ─────────────
   if (agentResponse.pasar_a_humano) {
@@ -391,19 +324,27 @@ export async function processMessage(
       userMessage: message,
     };
 
-    const retryResult = await callClaude(retryContext);
+    const retryResult = await generateAgentResponse(retryContext);
     if (retryResult.ok) {
-      const retryParseResult = parseAgentResponse(retryResult.value);
-      if (retryParseResult.ok) {
-        const retryGuard = checkLanguage(retryParseResult.value.respuesta, rules.prohibited_phrases);
-        if (retryGuard.passed) {
-          agentResponse = retryParseResult.value;
-        } else {
-          // Doble fallo — usar respuesta original, loguear
-          console.error('[language-guard] Doble fallo en regeneración:', retryGuard.violations);
-        }
+      const retryGuard = checkLanguage(retryResult.value.respuesta, rules.prohibited_phrases);
+      if (retryGuard.passed) {
+        agentResponse = retryResult.value;
+      } else {
+        // Doble fallo — usar respuesta original, loguear
+        console.error('[language-guard] Doble fallo en regeneración:', retryGuard.violations);
       }
     }
+  }
+
+  // Re-normalizar modo B por si el reintento lo activó
+  if (agentResponse.pasar_a_humano) {
+    agentResponse = {
+      ...agentResponse,
+      respuesta: '',
+      fragmentos: null,
+      requiere_humano: true,
+      accion_venta: 'derivacion_humano',
+    };
   }
 
   // ─── Paso 11: Merge de scoring (backend como autoridad) ──────────────────
