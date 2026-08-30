@@ -217,6 +217,12 @@ export interface AgentResponse {
   accion_venta: AccionVenta;
   /** true → escalar inmediatamente al equipo humano */
   requiere_humano: boolean;
+  /**
+   * true → NO enviar ninguna respuesta al cliente; un asesor humano continúa.
+   * Se usa cuando el agente no puede responder bien (técnico fuera de alcance,
+   * reclamo, garantía de equipo ya comprado, acusación). respuesta queda vacía.
+   */
+  pasar_a_humano: boolean;
   /** Followup a programar, o null si no corresponde */
   followup: FollowupSpec | null;
   /**

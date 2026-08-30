@@ -475,6 +475,19 @@ async function flushLeadTurn(phone: string): Promise<void> {
   const { respuesta, agentResponse, escalated } = processResult.value;
   const fragmentos = agentResponse.fragmentos;
 
+  // ── Modo B: el agente se calló — NO enviar nada, avisar al equipo ────────
+  if (agentResponse.pasar_a_humano || !respuesta.trim()) {
+    console.warn(`[kommo] 🟡 SIN RESPUESTA — ${phone}: el agente derivó a un asesor. "${messageText.slice(0, 80)}"`);
+    if (leadId) {
+      addNote(leadId, `🟡 El agente no respondió este mensaje (necesita un asesor):\n"${messageText}"`)
+        .catch(() => void 0);
+      const tipo = classifyTipoConsulta(messageText, agentResponse);
+      syncToKommo(leadId, agentResponse, tipo, channel)
+        .catch((err: unknown) => { console.error('[kommo] syncToKommo falló:', err); });
+    }
+    return;
+  }
+
   // ── Fragmentación + tipeo humano + Salesbot ──────────────────────────────
   if (leadId) {
     const fieldId = Number(process.env['KOMMO_FIELD_IA_RESPUESTA'] ?? '0');

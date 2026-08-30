@@ -42,7 +42,6 @@ export const AgentResponseSchema = z
   .object({
     respuesta: z
       .string()
-      .min(1, 'respuesta no puede estar vacía')
       .max(2000, 'respuesta demasiado larga para WhatsApp'),
 
     fragmentos: z
@@ -74,6 +73,8 @@ export const AgentResponseSchema = z
     ]),
 
     requiere_humano: z.boolean(),
+
+    pasar_a_humano: z.boolean().default(false),
 
     followup: FollowupSpecSchema.nullable(),
 

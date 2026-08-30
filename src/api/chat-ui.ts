@@ -120,8 +120,22 @@ export const CHAT_SIM_HTML = /* html */ `<!doctype html>
       });
       const j = await r.json();
       if(!j.ok){ typing.style.display = 'none'; addBubble('⚠️ error: ' + (j.error?.message || 'desconocido'), 'in'); return; }
-      const parts = j.data.agentResponse.fragmentos || [j.data.respuesta];
+      const ar = j.data.agentResponse;
       const rt = rtBox.checked;
+
+      // Modo B: el agente se calló, sigue un asesor
+      if(ar.pasar_a_humano || !(j.data.respuesta || '').trim()){
+        await wait(rt ? 2000 : 150);
+        typing.style.display = 'none';
+        const d = document.createElement('div');
+        d.className = 'dbg';
+        d.textContent = '🟡 el agente no respondió — un asesor continúa esta conversación';
+        log.appendChild(d); log.scrollTop = log.scrollHeight;
+        addDebug(ar);
+        return;
+      }
+
+      const parts = ar.fragmentos || [j.data.respuesta];
 
       // La espera larga (debounce ~10s) ya pasó — sólo una pausa natural corta
       await wait(rt ? 1200 + Math.random()*1300 : 150);

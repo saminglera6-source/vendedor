@@ -348,8 +348,21 @@ export async function processMessage(
 
   let agentResponse = parseResult.value;
 
-  // ─── Paso 10: Language guard ──────────────────────────────────────────────
-  const guardResult = checkLanguage(agentResponse.respuesta, rules.prohibited_phrases);
+  // ─── Modo B: el agente decide no responder — un humano sigue ─────────────
+  if (agentResponse.pasar_a_humano) {
+    agentResponse = {
+      ...agentResponse,
+      respuesta: '',
+      fragmentos: null,
+      requiere_humano: true,
+      accion_venta: 'derivacion_humano',
+    };
+  }
+
+  // ─── Paso 10: Language guard (se saltea si no hay respuesta) ─────────────
+  const guardResult = agentResponse.respuesta.trim()
+    ? checkLanguage(agentResponse.respuesta, rules.prohibited_phrases)
+    : { passed: true as const, violations: [] as string[] };
 
   if (!guardResult.passed) {
     // Loguear el fallo (fire and forget — no bloquear la respuesta)
@@ -433,16 +446,19 @@ export async function processMessage(
     },
   });
 
-  // Mensaje del asistente (con metadata de venta)
+  // Mensaje del asistente — o nota interna si el agente se calló (modo B)
   await appendMessage({
     lead_id: lead.id,
     role: 'assistant',
-    content: finalResponse.respuesta,
+    content: finalResponse.pasar_a_humano
+      ? '[SIN RESPUESTA AUTOMÁTICA — derivado a un asesor humano]'
+      : finalResponse.respuesta,
     metadata: {
       intencion: finalResponse.intencion,
       accion_venta: finalResponse.accion_venta,
       estado_en_momento: finalResponse.estado,
       lead_score_en_momento: finalResponse.lead_score,
+      ...(finalResponse.pasar_a_humano && { sin_respuesta: true }),
     },
   });
 
