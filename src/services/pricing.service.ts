@@ -455,6 +455,24 @@ const FALLA_LABEL: Record<string, string> = {
   parlante: 'parlante', tapa: 'tapa trasera', marco: 'marco', pin: 'pin de carga',
 };
 
+/**
+ * iPhones cuyo precio A PEDIDO entra en el presupuesto (con 12% de margen para
+ * negociar). Para cuando el cliente da un tope y no un modelo puntual.
+ * Devuelve hasta `limit` filas, del más caro (mejor) al más barato.
+ */
+export function findPreciosEnPresupuesto(
+  data: PricingData,
+  maxARS: number,
+  limit = 5,
+): PrecioRow[] {
+  if (!(maxARS > 0)) return [];
+  const tope = maxARS * 1.12;
+  return data.precios
+    .filter((r) => /^iPhone/i.test(r.modelo) && r.preventaARS > 0 && r.preventaARS <= tope)
+    .sort((a, b) => b.preventaARS - a.preventaARS)
+    .slice(0, limit);
+}
+
 /** Valor de toma exacto = impecable − suma de descuentos de las fallas presentes. */
 export function estimarToma(
   row: TomaRow,

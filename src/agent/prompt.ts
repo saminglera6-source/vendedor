@@ -1119,8 +1119,16 @@ function buildDynamicBlock(
 
   // RAG chunks (vacío en V1 sin RAG implementado)
   if (ragChunks.length > 0) {
+    // Censurar precios y montos de los ejemplos: el modelo tiende a copiarlos
+    // aunque se le diga que no. Sin número que copiar, no hay fuga.
+    const censurarMontos = (s: string): string =>
+      s
+        .replace(/\$\s?\d[\d.,]*\s?(mil|lucas|k)?/gi, '$___')
+        .replace(/\b\d{2,3}\.\d{3}\b/g, '___')
+        .replace(/\b\d{2,3}(\.\d{3})?\s?(mil|lucas|k)\b/gi, '___')
+        .replace(/(u\$s|usd)\s?\d[\d.,]*/gi, 'u$s ___');
     const chunkLines = ragChunks.map(
-      (c, i) => `— Ejemplo ${i + 1} —\n${c.content}`
+      (c, i) => `— Ejemplo ${i + 1} —\n${censurarMontos(c.content)}`
     );
     sections.push(
       `CÓMO RESPONDEN DE VERDAD LOS VENDEDORES DE GREATPHONES\n` +

@@ -64,10 +64,41 @@ const MODEL_ALIASES: ReadonlyArray<[pattern: string, canonical: string]> = [
   ['iphone 14 pro',     'iPhone 14 Pro'],
   ['14 pro',            'iPhone 14 Pro'],
   ['iphone 14',         'iPhone 14'],
+  // ── iPhone 14 (extra) ──────────────────────────────────────────────────
+  ['iphone 14 plus',    'iPhone 14 Plus'],
+  ['14 plus',           'iPhone 14 Plus'],
   // ── iPhone 13 ──────────────────────────────────────────────────────────
+  ['iphone 13 pro max', 'iPhone 13 Pro Max'],
+  ['13 pro max',        'iPhone 13 Pro Max'],
   ['iphone 13 pro',     'iPhone 13 Pro'],
   ['13 pro',            'iPhone 13 Pro'],
+  ['iphone 13 mini',    'iPhone 13 Mini'],
+  ['13 mini',           'iPhone 13 Mini'],
   ['iphone 13',         'iPhone 13'],
+  // ── iPhone 12 ──────────────────────────────────────────────────────────
+  ['iphone 12 pro max', 'iPhone 12 Pro Max'],
+  ['12 pro max',        'iPhone 12 Pro Max'],
+  ['iphone 12 pro',     'iPhone 12 Pro'],
+  ['12 pro',            'iPhone 12 Pro'],
+  ['iphone 12 mini',    'iPhone 12 Mini'],
+  ['12 mini',           'iPhone 12 Mini'],
+  ['iphone 12',         'iPhone 12'],
+  // ── iPhone 11 ──────────────────────────────────────────────────────────
+  ['iphone 11 pro max', 'iPhone 11 Pro Max'],
+  ['11 pro max',        'iPhone 11 Pro Max'],
+  ['iphone 11 pro',     'iPhone 11 Pro'],
+  ['11 pro',            'iPhone 11 Pro'],
+  ['iphone 11',         'iPhone 11'],
+  // ── iPhone X / XR / XS ─────────────────────────────────────────────────
+  ['iphone xs max',     'iPhone XS Max'],
+  ['xs max',            'iPhone XS Max'],
+  ['iphone xs',         'iPhone XS'],
+  ['iphone xr',         'iPhone XR'],
+  ['iphone x',          'iPhone X'],
+  // ── iPhone 8 ───────────────────────────────────────────────────────────
+  ['iphone 8 plus',     'iPhone 8 Plus'],
+  ['8 plus',            'iPhone 8 Plus'],
+  ['iphone 8',          'iPhone 8'],
   // ── Samsung Galaxy S ───────────────────────────────────────────────────
   ['galaxy s25 ultra',  'Samsung Galaxy S25 Ultra'],
   ['s25 ultra',         'Samsung Galaxy S25 Ultra'],
@@ -335,7 +366,31 @@ export function extractBrandFromModel(canonicalModel: string): string | null {
 export function detectBudgetFromText(
   text: string,
 ): { min?: number; max?: number } | null {
-  const normalized = normalizeText(text);
+  // Normalización propia: minúsculas + sin acentos, pero CONSERVA . , $ (los
+  // necesita para montos). normalizeText() los borra y rompe "1.2 millones".
+  const normalized = text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // X millon / XM  (chequear primero: "1.5 millones")
+  const millonMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*(?:millones?|palos?|\bm\b)/);
+  if (millonMatch?.[1]) {
+    const value = parseFloat(millonMatch[1].replace(',', '.')) * 1_000_000;
+    return deriveMinMax(normalized, value);
+  }
+  if (/\bmedio\s+palo\b/.test(normalized)) return deriveMinMax(normalized, 500_000);
+
+  // X lucas / X mil / Xk / X luca  → SIEMPRE son miles (×1000), salvo que el
+  // número ya sea grande (ej "500.000 mil" mal escrito).
+  const lucasMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*(?:lucas?|mil\b|k\b|palos?)/);
+  if (lucasMatch?.[1]) {
+    const base = parseFloat(lucasMatch[1].replace(/\./g, '').replace(',', '.'));
+    const value = base >= 100_000 ? base : Math.round(base * 1_000);
+    return deriveMinMax(normalized, value);
+  }
 
   // $X.XXX.XXX o $XXXXXX — formato explícito con signo pesos
   const pesoMatch = normalized.match(/\$\s*([\d][.,\d]*)/);
@@ -344,27 +399,18 @@ export function detectBudgetFromText(
     if (value > 0) return deriveMinMax(normalized, value);
   }
 
-  // X lucas / X mil / Xk / X.000
-  const lucasMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*(?:lucas|mil\b|\.000\b)/);
-  if (lucasMatch?.[1]) {
-    const base = parseArgentineNumber(lucasMatch[1]);
-    const value = base < 100 ? base * 1000 : base; // "200 mil" → 200_000
-    return deriveMinMax(normalized, value);
+  // Número grande suelto en contexto de presupuesto: "presupuesto 500000",
+  // "tengo 450000", "hasta 600000"
+  const bigMatch = normalized.match(/\b(\d{5,7})\b/);
+  if (bigMatch?.[1] && /(presupuesto|gastar|pagar|tengo|hasta|tope|maximo|no paso|invertir|plata)/.test(normalized)) {
+    return deriveMinMax(normalized, parseInt(bigMatch[1], 10));
   }
 
-  // X millon / XM
-  const millonMatch = normalized.match(/(\d+(?:[.,]\d+)?)\s*(?:millones?|M\b)/);
-  if (millonMatch?.[1]) {
-    const value = parseFloat(millonMatch[1].replace(',', '.')) * 1_000_000;
-    return deriveMinMax(normalized, value);
-  }
-
-  // Número puro tipo "hasta 300" — si es < 10,000 asume miles (contexto celulares AR)
-  const bareMatch = normalized.match(/(?:hasta|no paso de|maximo|tope)[\s,]*(\d{2,4})\b/);
+  // Número puro tipo "hasta 300" / "no paso de 400" — asume miles
+  const bareMatch = normalized.match(/(?:hasta|no paso de|maximo|tope|presupuesto de|gastar|unos?)\s*(\d{2,4})\b/);
   if (bareMatch?.[1]) {
     const base = parseInt(bareMatch[1], 10);
-    const value = base < 10_000 ? base * 1_000 : base;
-    return { max: value };
+    return { max: base < 10_000 ? base * 1_000 : base };
   }
 
   // Rango: "entre X y Y"

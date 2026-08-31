@@ -40,6 +40,7 @@ import {
   detectBateriaPct,
   detectTradeIn,
   detectModelosMencionados,
+  findPreciosEnPresupuesto,
 } from '../services/pricing.service.js';
 import { assessLead } from '../services/lead-scoring.service.js';
 import { getOrCreate, applyPatch, regenerateResumen } from '../services/customer-memory.service.js';
@@ -204,9 +205,18 @@ export async function processMessage(
         (m) => !modeloTomaRaw || normModelo(m) !== normModelo(modeloTomaRaw),
       );
 
-      const preciosRaw = modelosConsulta.flatMap((mod) =>
+      // Presupuesto (del mensaje o de memoria) para cuando no nombró modelo.
+      const budgetMax =
+        parsed?.presupuesto?.max ?? memory?.presupuesto_max ?? null;
+
+      let preciosRaw = modelosConsulta.flatMap((mod) =>
         findPrecios(data, mod, modelosConsulta.length > 1 ? null : almacenamientoConsulta),
       );
+      // Si no hay modelo pedido pero sí un tope de presupuesto → mostrar
+      // iPhones que entran, con precios REALES (evita que el agente los invente).
+      if (preciosRaw.length === 0 && budgetMax) {
+        preciosRaw = findPreciosEnPresupuesto(data, budgetMax);
+      }
       // Dedup por modelo+almacenamiento
       const vistos = new Set<string>();
       const precios = preciosRaw
