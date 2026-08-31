@@ -26,10 +26,7 @@ import { createFollowup, cancelPendingFollowups } from '../db/followups.js';
 import { createAiFeedback } from '../db/ai-feedback.js';
 
 // — Services —
-import { matchFromMessage, normalizeModel, normalizeText } from '../services/product-matching.service.js';
-
-/** Normaliza un nombre de modelo para comparar (canónico + sin acentos). */
-const normModelo = (m: string): string => normalizeText(normalizeModel(m) ?? m);
+import { matchFromMessage, normalizeModel, normalizeText, formatPrice } from '../services/product-matching.service.js';
 import {
   getPricing,
   findPrecios,
@@ -44,6 +41,9 @@ import {
 } from '../services/pricing.service.js';
 import { assessLead } from '../services/lead-scoring.service.js';
 import { getOrCreate, applyPatch, regenerateResumen } from '../services/customer-memory.service.js';
+
+/** Normaliza un nombre de modelo para comparar (canónico + sin acentos). */
+const normModelo = (m: string): string => normalizeText(normalizeModel(m) ?? m);
 
 // — Agent layer —
 import { generateAgentResponse } from './llm/index.js';
@@ -96,6 +96,14 @@ function advanceEstado(a: LeadEstado, b: LeadEstado): LeadEstado {
   const idxA = ESTADO_ORDER.indexOf(a);
   const idxB = ESTADO_ORDER.indexOf(b);
   return idxA >= idxB ? a : b;
+}
+
+/** El menos avanzado de dos estados (para poner techo por score). */
+function leastAdvanced(a: LeadEstado, b: LeadEstado): LeadEstado {
+  if (a === 'PERDIDO' || b === 'PERDIDO') return 'PERDIDO';
+  const idxA = ESTADO_ORDER.indexOf(a);
+  const idxB = ESTADO_ORDER.indexOf(b);
+  return idxA <= idxB ? a : b;
 }
 
 // ===========================================================================
@@ -205,18 +213,48 @@ export async function processMessage(
         (m) => !modeloTomaRaw || normModelo(m) !== normModelo(modeloTomaRaw),
       );
 
+      // ── Valor de toma del equipo que entrega (se necesita para el presupuesto) ──
+      const almToma =
+        tradeIn?.almacenamiento ?? memory?.raw_preferences?.almacenamiento_actual ?? null;
+      const tomaRow = modeloTomaRaw ? findToma(data, modeloTomaRaw, almToma) : null;
+
+      // Batería del equipo a entregar: <85% ya cuenta como cambio de batería.
+      // Un % suelto cuenta como batería si el agente ya la preguntó O si hay
+      // un equipo en canje en juego (ahí "de 128 con 81%" = batería).
+      const bateriaEnContexto =
+        /bater[ií]a/i.test(textoCliente + ' ' + history.map((h) => h.content).join(' ')) ||
+        Boolean(tradeIn || modeloTomaRaw);
+      const bateriaPct = detectBateriaPct(textoCliente, bateriaEnContexto);
+      const fallas = detectFallas(
+        `${textoCliente}  ·  ${memory?.raw_preferences?.estado_equipo ?? ''}`,
+        bateriaPct,
+      );
+      const tomaCalc = tomaRow && fallas.length > 0 ? estimarToma(tomaRow, fallas) : null;
+      const tomaParaPresupuesto = tomaCalc?.total ?? tomaRow?.impecable ?? 0;
+
       // Presupuesto (del mensaje o de memoria) para cuando no nombró modelo.
+      // El poder de compra real = tope + lo que vale su equipo en parte de pago.
       const budgetMax =
         parsed?.presupuesto?.max ?? memory?.presupuesto_max ?? null;
+      const budgetEfectivo = budgetMax ? budgetMax + tomaParaPresupuesto : null;
 
       let preciosRaw = modelosConsulta.flatMap((mod) =>
         findPrecios(data, mod, modelosConsulta.length > 1 ? null : almacenamientoConsulta),
       );
-      // Si no hay modelo pedido pero sí un tope de presupuesto → mostrar
-      // iPhones que entran, con precios REALES (evita que el agente los invente).
-      if (preciosRaw.length === 0 && budgetMax) {
-        preciosRaw = findPreciosEnPresupuesto(data, budgetMax);
+      // 1 modelo sin GB especificado → cotizar el más barato (128) como
+      // referencia; el agente igual pregunta "128 o 256?".
+      if (modelosConsulta.length === 1 && !almacenamientoConsulta && preciosRaw.length > 1) {
+        preciosRaw = [preciosRaw.reduce((a, b) => (b.preventaARS < a.preventaARS ? b : a))];
       }
+      // Sin modelo pedido pero con tope → iPhones que entran, con precios REALES.
+      let esListaPorPresupuesto = false;
+      if (preciosRaw.length === 0 && budgetEfectivo) {
+        preciosRaw = findPreciosEnPresupuesto(data, budgetEfectivo);
+        esListaPorPresupuesto = preciosRaw.length > 0;
+      }
+      // ¿El cliente nombró el modelo EN ESTE turno? Si no (viene de memoria),
+      // el agente presenta la opción, no la da por elegida.
+      const modeloConfirmado = modelosMsg.length >= 1;
       // Dedup por modelo+almacenamiento
       const vistos = new Set<string>();
       const precios = preciosRaw
@@ -241,22 +279,6 @@ export async function processMessage(
               porCuota: c.porCuota,
             })),
         }));
-
-      const almToma =
-        tradeIn?.almacenamiento ?? memory?.raw_preferences?.almacenamiento_actual ?? null;
-      const tomaRow = modeloTomaRaw ? findToma(data, modeloTomaRaw, almToma) : null;
-
-      // Batería del equipo a entregar: <85% ya cuenta como cambio de batería.
-      // Si el agente ya preguntó por la batería, aceptar un % suelto como respuesta.
-      const bateriaEnContexto = /bater[ií]a/i.test(
-        textoCliente + ' ' + history.map((h) => h.content).join(' '),
-      );
-      const bateriaPct = detectBateriaPct(textoCliente, bateriaEnContexto);
-      const fallas = detectFallas(
-        `${textoCliente}  ·  ${memory?.raw_preferences?.estado_equipo ?? ''}`,
-        bateriaPct,
-      );
-      const tomaCalc = tomaRow && fallas.length > 0 ? estimarToma(tomaRow, fallas) : null;
 
       if (precios.length > 0 || tomaRow) {
         livePricing = {
@@ -286,6 +308,9 @@ export async function processMessage(
             : null,
           edadMinutos: Math.round((Date.now() - data.fetchedAt) / 60_000),
           promoVigenteHasta: data.promoAplicadaA.length > 0 ? data.promoVigenteHasta : null,
+          esListaPorPresupuesto,
+          poderDeCompra: budgetEfectivo,
+          modeloConfirmado,
         };
       }
     }
@@ -397,7 +422,21 @@ export async function processMessage(
     Math.max(agentResponse.lead_score, assessment.newScore),
     assessment.newScore + 8,
   );
-  const mergedEstado = advanceEstado(agentResponse.estado, assessment.suggestedEstado);
+
+  // Estado propuesto por score + Claude, PERO con techo según el score real
+  // (salvo compra explícita, que assessLead ya salta a LISTO por keyword).
+  const estadoPropuesto = advanceEstado(agentResponse.estado, assessment.suggestedEstado);
+  const compraExplicita = assessment.suggestedEstado === 'LISTO_PARA_COMPRAR';
+  const techoScore: LeadEstado =
+    mergedScore >= 86 ? 'LISTO_PARA_COMPRAR'
+    : mergedScore >= 66 ? 'MUY_INTERESADO'
+    : mergedScore >= 40 ? 'INTERESADO'
+    : mergedScore >= 8 ? 'CONSULTA'
+    : 'NEW';
+  const acotado = compraExplicita
+    ? estadoPropuesto
+    : leastAdvanced(estadoPropuesto, techoScore);
+  const mergedEstado = advanceEstado(acotado, lead.estado); // nunca retroceder
   const mergedRequiereHumano = agentResponse.requiere_humano || assessment.requiresHuman;
 
   const finalResponse: AgentResponse = {
@@ -406,6 +445,36 @@ export async function processMessage(
     estado: mergedEstado,
     requiere_humano: mergedRequiereHumano,
   };
+
+  // ─── Guardia de montos: el modelo a veces corrompe un dígito de un precio ─
+  // ya calculado. Reemplaza montos que estén cerca (±3%) de un valor canónico
+  // por el valor exacto. No inventa: solo corrige un número casi-correcto.
+  if (livePricing) {
+    const canon = new Set<number>();
+    const add = (n: number): void => { if (n > 0) canon.add(Math.round(n)); };
+    const tomaTotal = livePricing.toma?.calculada?.total ?? livePricing.toma?.impecable ?? 0;
+    if (tomaTotal) add(tomaTotal);
+    for (const p of livePricing.precios) {
+      add(p.precioARS); add(p.preventaARS);
+      if (tomaTotal) { add(p.precioARS - tomaTotal); add(p.preventaARS - tomaTotal); }
+      for (const c of [...p.cuotasContado, ...p.cuotasPreventa]) add(c.porCuota);
+    }
+    const canonArr = [...canon];
+    const snap = (txt: string): string =>
+      txt.replace(/\$\s?([\d][\d.]*\d)/g, (m, digits: string) => {
+        const val = Number(digits.replace(/\./g, ''));
+        if (!Number.isFinite(val) || val < 10_000) return m;
+        const cerca = canonArr.filter((c) => Math.abs(c - val) / c <= 0.015);
+        if (cerca.length === 1 && cerca[0] !== val) {
+          return formatPrice(cerca[0]!);
+        }
+        return m;
+      });
+    finalResponse.respuesta = snap(finalResponse.respuesta);
+    if (finalResponse.fragmentos) {
+      finalResponse.fragmentos = finalResponse.fragmentos.map(snap);
+    }
+  }
 
   // ─── Paso 11: Persistir en una pasada ────────────────────────────────────
   //

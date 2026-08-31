@@ -483,6 +483,20 @@ export interface LivePricingContext {
   edadMinutos: number;
   /** Si el precio de preventa que se muestra es una PROMO por tiempo limitado: hasta cuándo. */
   promoVigenteHasta: string | null;
+  /**
+   * true = la lista de `precios` son opciones que ENTRAN en el presupuesto del
+   * cliente (no eligió un modelo). El agente debe presentarlas y pedir que elija,
+   * no dar todavía un "te quedarían a abonar".
+   */
+  esListaPorPresupuesto: boolean;
+  /** Poder de compra estimado: presupuesto + valor de toma (si hay canje). */
+  poderDeCompra: number | null;
+  /**
+   * true = el cliente nombró el modelo en este turno (podés cerrar con una
+   * frase de diferencia). false = viene inferido de memoria → presentá la
+   * opción y confirmá antes de dar el "te quedarían a abonar".
+   */
+  modeloConfirmado: boolean;
 }
 
 // ===========================================================================

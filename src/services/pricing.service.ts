@@ -463,12 +463,18 @@ const FALLA_LABEL: Record<string, string> = {
 export function findPreciosEnPresupuesto(
   data: PricingData,
   maxARS: number,
-  limit = 5,
+  limit = 8,
 ): PrecioRow[] {
   if (!(maxARS > 0)) return [];
-  const tope = maxARS * 1.12;
-  return data.precios
-    .filter((r) => /^iPhone/i.test(r.modelo) && r.preventaARS > 0 && r.preventaARS <= tope)
+  const tope = maxARS * 1.05; // margen chico; el canje se maneja en la charla
+  // Una fila por modelo (la de menor precio a pedido)
+  const porModelo = new Map<string, PrecioRow>();
+  for (const r of data.precios) {
+    if (!/^iPhone/i.test(r.modelo) || !(r.preventaARS > 0) || r.preventaARS > tope) continue;
+    const prev = porModelo.get(r.modelo);
+    if (!prev || r.preventaARS < prev.preventaARS) porModelo.set(r.modelo, r);
+  }
+  return [...porModelo.values()]
     .sort((a, b) => b.preventaARS - a.preventaARS)
     .slice(0, limit);
 }

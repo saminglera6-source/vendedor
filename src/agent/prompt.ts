@@ -1094,11 +1094,20 @@ function buildDynamicBlock(
         `Usalo con un poco de urgencia real: "esta semana está a este precio", "es la oferta de ahora". ` +
         `Sin inventar: cuando pase esa fecha vuelve al valor habitual.`
       : '';
+    const budgetNote = livePricing.esListaPorPresupuesto
+      ? `\n\nMODO PRESUPUESTO: el cliente dio un tope y NO eligió modelo. La lista de arriba son los ` +
+        (livePricing.poderDeCompra
+          ? `iPhones que le entran con su poder de compra de ${formatPrice(livePricing.poderDeCompra)} ` +
+            `(su presupuesto + lo que vale su equipo en parte de pago). `
+          : `iPhones dentro de su presupuesto. `) +
+        `Presentáselos con el precio (a pedido primero, es el más barato), destacá 2-3, y pedile que ELIJA uno. ` +
+        `NO le des todavía un "te quedarían a abonar $X" — eso es cuando elija el modelo.`
+      : '';
     sections.push(
       `PRECIOS EN VIVO${staleWarn} — usar SOLO estos valores. Precio con entrega rápida, precio a pedido y CUOTAS ya vienen calculados; NO recalcular.\n` +
       lines.join('\n') +
       `\nSi el cliente pide un almacenamiento que no está en esta lista → pedir el dato o data_faltante.` +
-      promoNote,
+      promoNote + budgetNote,
     );
   } else {
     sections.push(
@@ -1175,17 +1184,43 @@ function buildDynamicBlock(
       }
       canje += '\nLa valuación definitiva siempre se confirma con el equipo en mano.';
 
-      // Diferencia a abonar ya calculada (contado/preventa − valor de toma)
-      if (t.calculada && livePricing.precios.length > 0) {
+      // Diferencia a abonar ya calculada (contado/preventa − valor de toma).
+      // Números listos: el modelo NO debe restar ni sumar nada, solo leer.
+      // En modo presupuesto NO se muestra (el cliente todavía no eligió modelo).
+      if (t.calculada && livePricing.precios.length > 0 && !livePricing.esListaPorPresupuesto) {
         const toma = t.calculada.total;
-        const difLines = livePricing.precios.map((p) => {
+
+        if (livePricing.precios.length === 1 && livePricing.modeloConfirmado) {
+          // Un solo modelo, elegido por el cliente → frase lista para mandar tal cual.
+          const p = livePricing.precios[0]!;
+          const alm = p.almacenamiento ? ` de ${p.almacenamiento}` : '';
+          const aPedido = formatPrice(Math.max(0, p.preventaARS - toma));
+          const eRapida = formatPrice(Math.max(0, p.precioARS - toma));
+          canje +=
+            `\n\n━━━ RESPUESTA DE DIFERENCIA — MANDÁ ESTA FRASE TAL CUAL (no cambies ni un número) ━━━\n` +
+            `"entregando tu equipo, por el ${p.modelo}${alm} te quedan a abonar ${aPedido} a pedido ` +
+            `(te llega en 10 a 15 días hábiles) o ${eRapida} con entrega rápida"\n` +
+            `Después seguí con una pregunta que avance (color, cuándo se pasa, etc.).`;
+        } else if (livePricing.precios.length === 1 && !livePricing.modeloConfirmado) {
+          const p = livePricing.precios[0]!;
           const alm = p.almacenamiento ? ` ${p.almacenamiento}` : '';
-          return `- ${p.modelo}${alm}: te quedarían a abonar ${formatPrice(Math.max(0, p.precioARS - toma))} ` +
-            `(o ${formatPrice(Math.max(0, p.preventaARS - toma))} a pedido)`;
-        });
-        canje +=
-          `\n\nDIFERENCIA A ABONAR (ya calculada — usar tal cual, frase "te quedarían a abonar"):\n` +
-          difLines.join('\n');
+          const aPedido = formatPrice(Math.max(0, p.preventaARS - toma));
+          canje +=
+            `\n\nEl cliente NO confirmó qué modelo quiere (esto es inferencia). Antes de dar el número,\n` +
+            `confirmá: "¿te referís al ${p.modelo}${alm}?". Si dice que sí → te quedan a abonar ${aPedido} a pedido.`;
+        } else {
+          const difLines = livePricing.precios.map((p) => {
+            const alm = p.almacenamiento ? ` ${p.almacenamiento}` : '';
+            const eRapida = formatPrice(Math.max(0, p.precioARS - toma));
+            const aPedido = formatPrice(Math.max(0, p.preventaARS - toma));
+            return `  ${p.modelo}${alm}: a pedido te quedan a abonar ${aPedido} · con entrega rápida ${eRapida}`;
+          });
+          canje +=
+            `\n\n━━━ DIFERENCIA A ABONAR — YA CALCULADA, LEER TAL CUAL ━━━\n` +
+            `Toma del equipo del cliente: ${formatPrice(toma)}. Números finales por modelo:\n` +
+            difLines.join('\n') +
+            `\nProhibido: recalcular, redondear distinto, o dar un número que no esté en esta lista.`;
+        }
       }
     } else {
       canje +=
