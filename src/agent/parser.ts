@@ -53,12 +53,12 @@ export const AgentResponseSchema = z
       .catch(''),
 
     // Preprocesado: un array de <2 elementos no tiene sentido como fragmentos
-    // (se manda un solo mensaje) → null. Más de 3 → recortar. Filtrar vacíos.
+    // (se manda un solo mensaje) → null. Más de 4 → recortar. Filtrar vacíos.
     fragmentos: z.preprocess((v) => {
       if (!Array.isArray(v)) return null;
-      const cleaned = v.filter((x) => typeof x === 'string' && x.trim()).map((x) => (x as string).slice(0, 700));
+      const cleaned = v.filter((x) => typeof x === 'string' && x.trim()).map((x) => (x as string).slice(0, 400));
       if (cleaned.length < 2) return null;
-      return cleaned.slice(0, 3);
+      return cleaned.slice(0, 4);
     }, z.array(z.string()).nullable()),
 
     lead_score: z

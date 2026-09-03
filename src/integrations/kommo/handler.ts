@@ -15,7 +15,7 @@
 import { createHmac } from 'node:crypto';
 
 import { processMessage } from '../../agent/index.js';
-import { launchSalesbot, updateLeadCustomField, addNote } from './client.js';
+import { launchSalesbot, updateLeadCustomField, addNote, getTalkMessages, getLead } from './client.js';
 import { classifyTipoConsulta, extractPhoneFromSenderId, extractChannelFromSenderId } from './classifier.js';
 import { syncToKommo } from './pipeline.js';
 import type { KommoMessageWebhook } from './types.js';
@@ -337,25 +337,37 @@ const rand = (min: number, max: number): number => min + Math.random() * (max - 
 
 /**
  * Ventana de espera tras el último mensaje del cliente antes de empezar a
- * responder. Da tiempo a que el cliente mande varios mensajes seguidos y el
- * agente los lea todos juntos como una sola idea.
+ * responder. No es solo para coalescer mensajes: es tiempo real de reacción.
+ * Una persona no contesta al segundo — mira el celular cuando puede.
+ * Default: 5 minutos. Cada mensaje nuevo del cliente reinicia la ventana.
  */
-const DEBOUNCE_MS = Number(process.env['KOMMO_DEBOUNCE_MS'] ?? 10_000);
+const DEBOUNCE_MS = Number(process.env['KOMMO_DEBOUNCE_MS'] ?? 5 * 60_000);
 
-/** Pequeña pausa natural después de la ventana de debounce, antes del primer fragmento. */
+/** Pequeña pausa natural después de la ventana de espera, antes del primer fragmento. */
 function computeInitialDelay(): number {
-  return rand(1_000, 2_500);
+  return rand(1_500, 4_000);
 }
 
 /**
- * Tiempo de "tipeo" de un mensaje antes de enviarlo. Proporcional al largo:
- * un mensaje largo tarda más que uno corto, como si lo escribiera una persona.
- * ~18 caracteres por segundo + arranque, con jitter, acotado a [1.4s, 12s].
+ * ¿Cuántos "renglones" ocupa un mensaje? Cuenta los saltos de línea explícitos
+ * y además parte los renglones largos cada ~42 caracteres (como al escribir en
+ * el teléfono). Mínimo 1.
+ */
+function contarRenglones(texto: string): number {
+  return texto
+    .split('\n')
+    .reduce((n, linea) => n + Math.max(1, Math.ceil(linea.trim().length / 42)), 0);
+}
+
+/**
+ * Tiempo de "tipeo" de un mensaje antes de enviarlo. ~2 segundos por renglón,
+ * con jitter, para que un mensaje de 3 renglones tarde ~6s y uno de 1 renglón
+ * ~2s — como si lo escribiera una persona. Acotado a [2s, 22s].
  */
 function computeTypingDelay(texto: string): number {
-  const base = 700 + texto.length * 55; // ≈ 18 cps
-  const jitter = rand(0.82, 1.22);
-  return Math.min(12_000, Math.max(1_400, base * jitter));
+  const base = contarRenglones(texto) * 2_000;
+  const jitter = rand(0.85, 1.2);
+  return Math.min(22_000, Math.max(2_000, base * jitter));
 }
 
 // ===========================================================================
@@ -373,6 +385,8 @@ interface LeadBuffer {
   timer: ReturnType<typeof setTimeout>;
   leadId: number | undefined;
   channel: string;
+  /** talk_id de Kommo — para traer el historial de la conversación */
+  talkId: string | undefined;
 }
 
 // Buffer de mensajes por lead mientras corre la ventana de debounce.
@@ -420,12 +434,57 @@ export async function handleKommoMessage(
 
   console.info(`[kommo] Mensaje de ${phone} vía ${channel}: "${messageText.slice(0, 80)}"`);
 
+  // ── 3b. Allowlist de pruebas ─────────────────────────────────────────────
+  // Si KOMMO_ALLOWLIST está seteada (lista separada por comas), el agente SOLO
+  // responde si el phone, el id del autor o el nombre del autor contiene alguno
+  // de esos textos. Vacía / sin setear = responde a todos (producción).
+  const allow = (process.env['KOMMO_ALLOWLIST'] ?? '')
+    .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  if (allow.length > 0) {
+    const huella = `${phone} ${author.id} ${author.name ?? ''}`.toLowerCase();
+    if (!allow.some((a) => huella.includes(a))) {
+      console.info(`[kommo] ⛔ ${phone} no está en KOMMO_ALLOWLIST — se ignora (modo prueba)`);
+      return { ok: true, value: { respuesta: '', escalated: false } };
+    }
+  }
+
+  // ── 3c. Filtro por etapa del lead en Kommo ────────────────────────────────
+  // BLOQUEADAS SIEMPRE (pase lo que pase con la allowlist): postventa, reclamo
+  // pendiente, venta cerrada. El agente NUNCA le habla a alguien ahí — evita
+  // exactamente el caso "ya encargó / está reclamando" a nivel Kommo, no solo prompt.
+  // KOMMO_ALLOWED_STATUS_IDS (opcional): si está seteada, solo responde a leads
+  // en esas etapas (ej. "143" = Venta Perdida, para la campaña de recuperación).
+  const BLOCKED_STATUS_IDS = new Set(
+    (process.env['KOMMO_BLOCKED_STATUS_IDS'] ?? '142,110921483,110921487')
+      .split(',').map((s) => s.trim()).filter(Boolean),
+  );
+  const allowedStatusIds = (process.env['KOMMO_ALLOWED_STATUS_IDS'] ?? '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+  if (conversation.lead_id && (BLOCKED_STATUS_IDS.size > 0 || allowedStatusIds.length > 0)) {
+    const leadResult = await getLead(conversation.lead_id);
+    if (leadResult.ok) {
+      const statusId = String(leadResult.value.status_id);
+      if (BLOCKED_STATUS_IDS.has(statusId)) {
+        console.info(`[kommo] ⛔ lead ${conversation.lead_id} en etapa bloqueada (${statusId}) — se ignora`);
+        return { ok: true, value: { respuesta: '', escalated: false } };
+      }
+      if (allowedStatusIds.length > 0 && !allowedStatusIds.includes(statusId)) {
+        console.info(`[kommo] ⛔ lead ${conversation.lead_id} fuera de KOMMO_ALLOWED_STATUS_IDS (etapa ${statusId}) — se ignora`);
+        return { ok: true, value: { respuesta: '', escalated: false } };
+      }
+    } else {
+      console.warn(`[kommo] no se pudo leer etapa del lead ${conversation.lead_id}: ${leadResult.error.message}`);
+    }
+  }
+
   // ── 4. Debounce: esperar ~10s por si el cliente manda más mensajes ────────
+  const talkId = message.channel.id || undefined;
   const existing = _pending.get(phone);
   if (existing) {
     clearTimeout(existing.timer);
     if (messageText) existing.texts.push(messageText);
     if (conversation.lead_id) existing.leadId = conversation.lead_id;
+    if (talkId) existing.talkId = talkId;
     existing.timer = setTimeout(() => { void flushLeadTurn(phone); }, DEBOUNCE_MS);
     console.info(`[kommo] +mensaje al buffer de ${phone} (${existing.texts.length}) — reinicia ventana ${DEBOUNCE_MS}ms`);
     return { ok: true, value: { respuesta: '', escalated: false } };
@@ -435,6 +494,7 @@ export async function handleKommoMessage(
     texts: messageText ? [messageText] : [],
     leadId: conversation.lead_id,
     channel,
+    talkId,
     timer: setTimeout(() => { void flushLeadTurn(phone); }, DEBOUNCE_MS),
   });
   console.info(`[kommo] buffer nuevo para ${phone} — ventana ${DEBOUNCE_MS}ms`);
@@ -455,8 +515,31 @@ async function flushLeadTurn(phone: string): Promise<void> {
   const leadId = buf.leadId;
   console.info(`[kommo] flush ${phone}: ${buf.texts.length} mensaje(s) → 1 turno`);
 
+  // Historial de la conversación en Kommo (lo que hablaron con los chicos ANTES
+  // del bot). Clave para no responderle a alguien que ya encargó o está reclamando.
+  let priorHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+  if (buf.talkId) {
+    const talkNum = Number(buf.talkId);
+    if (Number.isFinite(talkNum)) {
+      const hist = await getTalkMessages(talkNum);
+      if (hist.ok) {
+        priorHistory = hist.value
+          .map((m) => ({
+            role: (m.direction === 'incoming' ? 'user' : 'assistant') as 'user' | 'assistant',
+            content: m.text.trim(),
+          }))
+          .filter((m) => m.content && !buf.texts.includes(m.content))
+          .slice(-16);
+        console.info(`[kommo] historial Kommo talk ${talkNum}: ${priorHistory.length} mensajes`);
+      } else {
+        console.warn(`[kommo] no se pudo traer historial del talk ${talkNum}: ${hist.error.message}`);
+      }
+    }
+  }
+
   const processResult = await processMessage({
     phone,
+    priorHistory,
     message: messageText,
     channel: (['whatsapp', 'instagram', 'facebook', 'web'].includes(channel)
       ? channel
@@ -479,8 +562,11 @@ async function flushLeadTurn(phone: string): Promise<void> {
   if (agentResponse.pasar_a_humano || !respuesta.trim()) {
     console.warn(`[kommo] 🟡 SIN RESPUESTA — ${phone}: el agente derivó a un asesor. "${messageText.slice(0, 80)}"`);
     if (leadId) {
-      addNote(leadId, `🟡 El agente no respondió este mensaje (necesita un asesor):\n"${messageText}"`)
-        .catch(() => void 0);
+      const esSeña = /comprobante|transferenc|transferi|se[ñn][aé]|alias|ya te pas|ac[aá] va|adjunt/i.test(messageText);
+      const nota = esSeña
+        ? `🔥 SEÑA / COMPROBANTE — atender YA para confirmar la reserva\nMensaje del cliente:\n"${messageText}"`
+        : `🟡 El agente no respondió este mensaje (necesita un asesor):\n"${messageText}"`;
+      addNote(leadId, nota).catch(() => void 0);
       const tipo = classifyTipoConsulta(messageText, agentResponse);
       syncToKommo(leadId, agentResponse, tipo, channel)
         .catch((err: unknown) => { console.error('[kommo] syncToKommo falló:', err); });
@@ -503,8 +589,7 @@ async function flushLeadTurn(phone: string): Promise<void> {
       // así los mensajes van de a poco y no los 3 de golpe.
       for (let i = 0; i < parts.length; i++) {
         const typing = computeTypingDelay(parts[i]!);
-        if (i > 0) await sleep(typing);
-        else if (parts.length === 1) await sleep(typing * 0.5);
+        await sleep(typing);
         console.info(`[FRAGMENT] lead=${leadId} part=${i + 1}/${parts.length} typing=${Math.round(typing)}ms`);
         const fieldResult = await updateLeadCustomField(leadId, fieldId, parts[i]!);
         if (!fieldResult.ok) console.error('[kommo] updateLeadCustomField falló:', fieldResult.error.message);
@@ -516,6 +601,24 @@ async function flushLeadTurn(phone: string): Promise<void> {
     }
   } else {
     console.warn('[kommo] Sin lead_id — no se puede lanzar Salesbot');
+  }
+
+  // ── Nota de atención humana (Modo A: el bot sigue hablando pero el equipo
+  //    tiene que entrar) — cierre en curso, seña, comprobante, lead caliente ──
+  if (leadId && agentResponse.requiere_humano) {
+    const cierre = agentResponse.accion_venta === 'cierre_propuesto';
+    const textoLower = messageText.toLowerCase();
+    const seña = /comprobante|transfer|se[ñn][aé]|alias|ya te pas|pas[eé] la/i.test(textoLower);
+    const cabecera = seña
+      ? '🔥 SEÑA / COMPROBANTE — atender lo antes posible'
+      : cierre
+        ? '🔥 CIERRE EN CURSO — atender lo antes posible'
+        : '⚠️ Lead caliente — conviene que un asesor entre';
+    addNote(
+      leadId,
+      `${cabecera}\nÚltimo mensaje del cliente:\n"${messageText}"\n` +
+      `Score: ${agentResponse.lead_score} · Estado: ${agentResponse.estado}`,
+    ).catch(() => void 0);
   }
 
   // ── Sync con Kommo (fire-and-forget) ─────────────────────────────────────

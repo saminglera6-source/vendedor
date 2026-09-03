@@ -8,13 +8,15 @@
   },
   "scripts": {
     "dev": "node --env-file .env --watch --import tsx/esm src/api/routes.ts",
-    "build": "tsc",
-    "start": "node dist/api/routes.js",
+    "build": "echo \"sin build — se corre con tsx\"",
+    "start": "node --import tsx/esm src/api/routes.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
     "import-history": "tsx scripts/import-history.ts",
-    "import-kommo-history": "node --env-file .env --import tsx/esm scripts/import-kommo-history.ts"
+    "import-kommo-history": "node --env-file .env --import tsx/esm scripts/import-kommo-history.ts",
+    "serve": "bash -c 'lsof -ti:${PORT:-3000} | xargs kill -9 2>/dev/null; sleep 1; exec node --env-file .env --import tsx/esm src/api/routes.ts'",
+    "start:dist": "node dist/api/routes.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",

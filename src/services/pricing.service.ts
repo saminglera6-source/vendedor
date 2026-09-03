@@ -81,12 +81,19 @@ function hoyISO(): string {
 }
 
 function loadPromo(): { vigenteHasta: string; preventa: Map<string, number> } | null {
-  const path = process.env['PROMO_FILE'] ?? 'promo.json';
+  // En prod (Railway/Render) no hay archivo — se pasa el JSON por PROMO_JSON.
+  // Local: archivo promo.json (o PROMO_FILE).
   let raw: string;
-  try {
-    raw = readFileSync(path, 'utf-8');
-  } catch {
-    return null; // sin archivo → sin promo
+  const envJson = process.env['PROMO_JSON'];
+  if (envJson && envJson.trim().startsWith('{')) {
+    raw = envJson;
+  } else {
+    const path = process.env['PROMO_FILE'] ?? 'promo.json';
+    try {
+      raw = readFileSync(path, 'utf-8');
+    } catch {
+      return null; // sin archivo ni env → sin promo
+    }
   }
   let parsed: PromoFile;
   try {
@@ -317,12 +324,18 @@ export function detectFallas(text: string, bateriaPct?: number | null): Array<ke
 // Frases que introducen el equipo que el cliente ENTREGA. "cambio MI 15" sí
 // (apunta al equipo propio); "cambiarlo por un 17" NO (apunta al que quiere).
 const PERMUTA_INTRO = new RegExp(
-  '(entrego|entregando|doy|dando|dejo|tengo|cambio|cambiar|permuto)\\s+' +
-  '(un|una|el|la|mi)\\s*(iphone|i ?phone|1[0-7]|xs|xr)' +
+  '(entrego|entrega|entregar\\w*|entregando|doy|dando|dar|dejo|dejar|dejando|llevar|vendo|vender|' +
+  'permuto|permutar|cambio|cambiar|cambiando|tengo|ten[ií]a)\\s+' +
+  '(un|una|el|la|mi|mis)?\\s*(iphone|i ?phone|ih?pone|ipone|1[0-7]|xs|xr)' +
   '|a\\s+cuenta|parte\\s+de\\s+pago|en\\s+permuta|hacen\\s+permuta|hacen\\s+canje|de\\s+canje|plan\\s+canje' +
-  '|cu[aá]nto\\s+me\\s+tom|me\\s+tom[aá]n|lo\\s+entrego|para\\s+entregar|el\\s+m[ií]o\\s+es',
+  '|cu[aá]nto\\s+me\\s+tom|me\\s+tom[aá]n|lo\\s+entrego|(para|quisiera|quiero|quer[ií]a)\\s+entregar|el\\s+m[ií]o\\s+es',
   'i',
 );
+
+/** ¿El texto sugiere que el cliente quiere entregar un equipo en parte de pago? */
+export function hasPermutaIntent(text: string): boolean {
+  return /\b(entreg\w*|permut\w*|canje|a\s+cuenta|parte\s+de\s+pago|me\s+tom[aá]\w*|lo\s+doy|a\s+cambio)\b/i.test(text);
+}
 
 /**
  * Detecta el equipo que el cliente ofrece en parte de pago.
@@ -370,7 +383,10 @@ export async function getPricing(): Promise<Result<PricingData>> {
   const full = `${url}${sep}api=all&token=${encodeURIComponent(token)}`;
 
   try {
-    const res = await fetch(full, { redirect: 'follow', signal: AbortSignal.timeout(15_000) });
+    const res = await fetch(full, {
+      redirect: 'follow',
+      signal: AbortSignal.timeout(Number(process.env['PRICING_API_TIMEOUT_MS'] ?? 30_000)),
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = (await res.json()) as ApiResponse;
     if (!json.ok) throw new Error(json.error ?? 'respuesta ok:false');

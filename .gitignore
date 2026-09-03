@@ -13,3 +13,6 @@ vmlogs/
 
 # Promo puntual (se edita seguido, no versionar)
 promo.json
+
+# Listas de campaña con datos de clientes — NO versionar
+campana-*.csv

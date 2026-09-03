@@ -36,6 +36,7 @@ import {
   detectFallas,
   detectBateriaPct,
   detectTradeIn,
+  hasPermutaIntent,
   detectModelosMencionados,
   findPreciosEnPresupuesto,
 } from '../services/pricing.service.js';
@@ -63,7 +64,13 @@ export interface ProcessMessageInput {
   /** Mensaje recibido */
   message: string;
   /** Canal de origen — default: whatsapp */
-  channel?: 'whatsapp' | 'web';
+  channel?: 'whatsapp' | 'instagram' | 'facebook' | 'web';
+  /**
+   * Historial previo traído de una fuente externa (ej: la conversación en Kommo
+   * anterior a que el agente existiera). Se antepone al historial propio. Sirve
+   * para que el agente vea si la persona ya encargó, ya reclamó, etc.
+   */
+  priorHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
 }
 
 export interface ProcessMessageOutput {
@@ -96,6 +103,66 @@ function advanceEstado(a: LeadEstado, b: LeadEstado): LeadEstado {
   const idxA = ESTADO_ORDER.indexOf(a);
   const idxB = ESTADO_ORDER.indexOf(b);
   return idxA >= idxB ? a : b;
+}
+
+/**
+ * Parte una respuesta en 2-4 mensajes cortos estilo WhatsApp.
+ * Un mensaje solo = apariencia de bot. Los vendedores mandan la confirmación,
+ * el precio y la pregunta en burbujas separadas.
+ */
+function fragmentar(texto: string, existentes: string[] | null): string[] {
+  // Punto de partida: los fragmentos del modelo si ya vienen, si no el texto entero.
+  const fuente = existentes && existentes.length > 0 ? existentes : [texto];
+
+  // 1) Partir por saltos de línea y por oración en las partes largas.
+  let piezas: string[] = [];
+  for (const bloque of fuente) {
+    for (const linea of bloque.split(/\n+/).map((l) => l.trim()).filter(Boolean)) {
+      if (linea.length <= 165) {
+        piezas.push(linea);
+        continue;
+      }
+      // Linea larga -> cortar tras . ! ? conservando el signo.
+      // Enmascaramos los puntos de miles ("$545.000") para no cortar un numero.
+      const PH = String.fromCharCode(1);
+      const protegida = linea.replace(/(\d)\.(?=\d)/g, `$1${PH}`);
+      const oraciones = (protegida.match(/[^.!?]+(?:[.!?]+|$)/g) ?? [protegida])
+        .map((s) => s.split(PH).join("."));
+      let buffer = '';
+      for (const o of oraciones.map((s) => s.trim())) {
+        if ((buffer + ' ' + o).trim().length > 165 && buffer) {
+          piezas.push(buffer.trim());
+          buffer = o;
+        } else {
+          buffer = (buffer ? buffer + ' ' : '') + o;
+        }
+      }
+      if (buffer.trim()) piezas.push(buffer.trim());
+    }
+  }
+  // Reparar números partidos por el corte de oración ("$545. 000" → "$545.000").
+  piezas = piezas.map((p) => p.replace(/(\d)\.\s+(?=\d{3}\b)/g, '$1.'));
+
+  // 2) Unir fragmentos muy cortos con el siguiente (evita "Siii" solo).
+  const unidas: string[] = [];
+  for (const p of piezas) {
+    if (unidas.length > 0 && unidas[unidas.length - 1]!.length < 22) {
+      unidas[unidas.length - 1] = `${unidas[unidas.length - 1]} ${p}`.trim();
+    } else {
+      unidas.push(p);
+    }
+  }
+
+  // 3) Cap a 4: el excedente se pega al último.
+  if (unidas.length > 4) {
+    const cabeza = unidas.slice(0, 3);
+    cabeza.push(unidas.slice(3).join(' '));
+    piezas = cabeza;
+  } else {
+    piezas = unidas;
+  }
+
+  return piezas.filter(Boolean);
 }
 
 /** El menos avanzado de dos estados (para poner techo por score). */
@@ -132,9 +199,11 @@ export async function processMessage(
   input: ProcessMessageInput,
 ): Promise<Result<ProcessMessageOutput>> {
   const { phone, message, channel = 'whatsapp' } = input;
+  // La DB solo distingue 'whatsapp' | 'web'; instagram/facebook cuentan como whatsapp.
+  const leadChannel = channel === 'web' ? 'web' : 'whatsapp';
 
   // ─── Paso 1: Lead ────────────────────────────────────────────────────────
-  const leadResult = await createLead({ phone, channel });
+  const leadResult = await createLead({ phone, channel: leadChannel });
   if (!leadResult.ok) return err(leadResult.error);
   const lead = leadResult.value;
 
@@ -149,7 +218,15 @@ export async function processMessage(
 
   // ─── Paso 4: Historial (fallo no bloquea) ────────────────────────────────
   const historyResult = await getHistoryForPrompt(lead.id, 14);
-  const history = historyResult.ok ? historyResult.value : [];
+  const ownHistory = historyResult.ok ? historyResult.value : [];
+  // Se antepone el historial externo (Kommo pre-bot). Dedup simple por contenido
+  // y se corta a los últimos 18 turnos para no inflar el prompt.
+  const prior = input.priorHistory ?? [];
+  const vistos = new Set(ownHistory.map((h) => h.content.trim()));
+  const history = [
+    ...prior.filter((h) => h.content.trim() && !vistos.has(h.content.trim())),
+    ...ownHistory,
+  ].slice(-18);
 
   // ─── Paso 5: RAG — embed + búsqueda vectorial ────────────────────────────
   // Embeddings locales (Transformers.js) — sin API key. Fallo no bloquea:
@@ -160,8 +237,8 @@ export async function processMessage(
     if (embeddingResult.ok) {
       // Más ejemplos y umbral algo más laxo: el RAG acá se usa sobre todo
       // para calcar el estilo real, no solo para datos puntuales.
-      const ragTopK = Math.max(rules.rag_top_k.value ?? 4, 4);
-      const ragThreshold = Math.min(rules.rag_top_k.threshold ?? 0.7, 0.72);
+      const ragTopK = Math.max(rules.rag_top_k.value ?? 6, 6);
+      const ragThreshold = Math.min(rules.rag_top_k.threshold ?? 0.68, 0.68);
       const searchResult = await searchSimilar(embeddingResult.value, {
         topK: ragTopK,
         threshold: ragThreshold,
@@ -200,12 +277,26 @@ export async function processMessage(
       // como si fuera el que quiere comprar. detectTradeIn (sobre el segmento
       // de la frase de permuta) es más confiable que el valor de memoria.
       const tradeIn = detectTradeIn(textoCliente);
-      const modeloTomaRaw =
+      const permutaIntent =
+        Boolean(tradeIn) ||
+        Boolean(memory?.raw_preferences?.interesado_en_permuta) ||
+        hasPermutaIntent(textoCliente);
+      // Todos los modelos que el cliente nombró en toda la conversación, en orden.
+      const modelosEnTexto = detectModelosMencionados(textoCliente);
+      let modeloTomaRaw =
         tradeIn?.modelo ?? memory?.raw_preferences?.modelo_actual ?? null;
+      // Red de seguridad: hay intención de permuta pero no se pudo aislar el
+      // equipo (typo, frase rara). Si nombró 2+ modelos, el PRIMERO es el que
+      // entrega y el resto es lo que quiere comprar.
+      if (!modeloTomaRaw && permutaIntent && modelosEnTexto.length >= 2) {
+        modeloTomaRaw = modelosEnTexto[0]!;
+      }
 
       // Modelos que el cliente QUIERE (nombrados en el mensaje o en memoria),
       // excluyendo el que entrega en parte de pago.
-      const modelosMsg = detectModelosMencionados(message);
+      const modelosMsg = detectModelosMencionados(message).filter(
+        (m) => !modeloTomaRaw || normModelo(m) !== normModelo(modeloTomaRaw),
+      );
       const candidatos = modelosMsg.length > 0
         ? modelosMsg
         : [parsed?.modeloNormalizado ?? memory?.producto_interes].filter((x): x is string => !!x);
@@ -473,6 +564,40 @@ export async function processMessage(
     finalResponse.respuesta = snap(finalResponse.respuesta);
     if (finalResponse.fragmentos) {
       finalResponse.fragmentos = finalResponse.fragmentos.map(snap);
+    }
+
+    // ── Guardia anti-invención: en un flujo de canje con valor calculado, todos
+    // los montos "grandes" ($200k+) tienen que coincidir con un valor canónico.
+    // Si aparece uno inventado (ej: "$380.000" cuando la toma es $705.000) →
+    // callarse (Modo B) en vez de mandar un número falso.
+    if (livePricing.toma?.calculada && canonArr.length > 0 && !finalResponse.pasar_a_humano) {
+      const textos = [finalResponse.respuesta, ...(finalResponse.fragmentos ?? [])].join(' ');
+      const montos = [...textos.matchAll(/\$\s?([\d][\d.]*\d)/g)]
+        .map((mm) => Number(mm[1]!.replace(/\./g, '')))
+        .filter((v) => Number.isFinite(v) && v >= 200_000);
+      const inventado = montos.find(
+        (v) => !canonArr.some((c) => Math.abs(c - v) / c <= 0.03),
+      );
+      if (inventado !== undefined) {
+        console.error(
+          `[anti-invención] monto sin respaldo ($${inventado}) en flujo de canje — Modo B. ` +
+          `canon: ${canonArr.join(', ')}`,
+        );
+        finalResponse.respuesta = '';
+        finalResponse.fragmentos = null;
+        finalResponse.pasar_a_humano = true;
+        finalResponse.requiere_humano = true;
+        finalResponse.accion_venta = 'derivacion_humano';
+      }
+    }
+  }
+
+  // ─── Fragmentación: nunca un solo mensaje largo (parece bot) ─────────────
+  if (!finalResponse.pasar_a_humano && finalResponse.respuesta.trim()) {
+    const frags = fragmentar(finalResponse.respuesta, finalResponse.fragmentos);
+    if (frags.length >= 2) {
+      finalResponse.fragmentos = frags;
+      finalResponse.respuesta = frags.join('\n\n');
     }
   }
 

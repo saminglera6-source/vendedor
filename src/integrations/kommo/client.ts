@@ -220,23 +220,28 @@ export async function updateLeadCustomField(
  * Lanza el Salesbot sobre el lead para que envíe la respuesta almacenada
  * en IA_RESPUESTA al cliente por WhatsApp.
  *
- * BOT_ID se lee de KOMMO_BOT_ID en el entorno.
+ * Endpoint oficial (docs Kommo, verificado 2026-08):
+ *   POST /api/v2/salesbot/run   body: [{ bot_id, entity_id, entity_type }]
+ *   entity_type: 1 = contacto · 2 = lead   → respuesta 202 { success: true }
+ *
+ * BOT_ID se lee de KOMMO_BOT_ID. Se obtiene inspeccionando el bot en
+ * Automatizaciones → Bots (clic derecho → Inspeccionar → data-id).
  */
 export async function launchSalesbot(leadId: number): Promise<Result<void>> {
-  const botId = process.env['KOMMO_BOT_ID'];
+  const botId = Number(process.env['KOMMO_BOT_ID']);
   if (!botId) {
     return {
       ok: false,
       error: Object.assign(
-        new Error('KOMMO_BOT_ID no configurado'),
+        new Error('KOMMO_BOT_ID no configurado o no es numérico'),
         { code: 'KOMMO_CONFIG_MISSING' as const },
       ),
     };
   }
 
-  const result = await kommoFetch<unknown>(`/api/v4/bots/${botId}/run`, {
+  const result = await kommoFetch<unknown>('/api/v2/salesbot/run', {
     method: 'POST',
-    body: JSON.stringify({ entity_id: leadId, entity_type: 'leads' }),
+    body: JSON.stringify([{ bot_id: botId, entity_id: leadId, entity_type: 2 }]),
   });
 
   if (!result.ok) return result;
@@ -425,7 +430,8 @@ export async function getTalkMessages(
     for (const m of raw) {
       const messageType = typeof m['message_type'] === 'string' ? m['message_type'] : '';
       const text = typeof m['text'] === 'string' ? m['text'].trim() : '';
-      if (messageType !== 'text' || !text) continue;
+      // Aceptar texto y plantillas (la difusión de aniversario llega como 'template').
+      if ((messageType !== 'text' && messageType !== 'template') || !text) continue;
       // Placeholder de Kommo para mensajes previos a conectar el canal
       if (text.startsWith('This message contains media and was received')) continue;
 

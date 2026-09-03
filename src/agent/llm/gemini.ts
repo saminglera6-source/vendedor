@@ -15,7 +15,7 @@
 import { GoogleGenAI } from '@google/genai';
 
 // Timeout corto a propósito: si Gemini está lento, cortamos y decide el orquestador.
-const REQUEST_TIMEOUT_MS = Number(process.env['GEMINI_TIMEOUT_MS'] ?? 15_000);
+const REQUEST_TIMEOUT_MS = Number(process.env['GEMINI_TIMEOUT_MS'] ?? 35_000);
 
 /**
  * ¿El error es por saturación TEMPORAL de Gemini (vale la pena esperar)?
@@ -75,7 +75,10 @@ export function createGeminiProvider(): LlmProvider {
             systemInstruction: systemText,
             responseMimeType: 'application/json',
             temperature: 0.7,
-            maxOutputTokens: 4096,
+            maxOutputTokens: 3500,
+            // Gemini 3.x flash piensa por defecto (lento + se come el budget).
+            // 0 lo rechaza; 256 es el mínimo razonable (~2-3s). -1 = 30s+.
+            thinkingConfig: { thinkingBudget: Number(process.env['GEMINI_THINKING_BUDGET'] ?? 256) },
             abortSignal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
             httpOptions: { timeout: REQUEST_TIMEOUT_MS },
           },

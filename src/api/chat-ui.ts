@@ -40,8 +40,8 @@ export const CHAT_SIM_HTML = /* html */ `<!doctype html>
 <header>
   <div class="avatar">GP</div>
   <div class="meta"><b>GreatPhones (agente)</b><span id="phone"></span></div>
-  <label style="font-size:12px;color:var(--wa-muted);display:flex;align-items:center;gap:5px;cursor:pointer">
-    <input type="checkbox" id="realtime" checked> tiempos reales
+  <label style="font-size:12px;color:var(--wa-muted);display:flex;align-items:center;gap:5px;cursor:pointer" title="Espera 5 min antes de responder y tipea ~2s por renglón, igual que en WhatsApp real">
+    <input type="checkbox" id="realtime"> tiempos reales (5 min)
   </label>
   <button id="reset">Nuevo cliente</button>
 </header>
@@ -64,13 +64,14 @@ export const CHAT_SIM_HTML = /* html */ `<!doctype html>
   setPhone();
 
   const rtBox = document.getElementById('realtime');
-  try { rtBox.checked = localStorage.getItem('gp_realtime') !== '0'; } catch(e){}
+  try { rtBox.checked = localStorage.getItem('gp_realtime') === '1'; } catch(e){}
   rtBox.onchange = () => { try { localStorage.setItem('gp_realtime', rtBox.checked ? '1' : '0'); } catch(e){} };
 
   const wait = (ms) => new Promise(r => setTimeout(r, ms));
   const rand = (a, b) => a + Math.random() * (b - a);
-  // Mismo criterio que src/integrations/kommo/handler.ts
-  const typingDelay = (t) => Math.min(12000, Math.max(1400, (700 + t.length * 55) * rand(0.82, 1.22)));
+  // Mismo criterio que src/integrations/kommo/handler.ts: ~2s por renglón (42 chars/renglón)
+  const renglones = (t) => t.split('\\n').reduce((n,l) => n + Math.max(1, Math.ceil(l.trim().length/42)), 0);
+  const typingDelay = (t) => Math.min(22000, Math.max(2000, renglones(t) * 2000 * rand(0.85, 1.2)));
 
   function addBubble(text, dir){
     const row = document.createElement('div');
@@ -85,14 +86,15 @@ export const CHAT_SIM_HTML = /* html */ `<!doctype html>
   function addDebug(a){
     const d = document.createElement('div');
     d.className = 'dbg';
-    d.textContent = \`estado: \${a.estado} · score: \${a.lead_score} · intención: \${a.intencion} · acción: \${a.accion_venta}\${a.requiere_humano ? ' · 🔴 escalado' : ''}\`;
+    d.textContent = \`estado: \${a.estado} · score: \${a.lead_score} · intención: \${a.intencion} · acción: \${a.accion_venta}\${a.requiere_humano ? ' · 🔴 nota al equipo (atender)' : ''}\`;
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
   }
 
-  const DEBOUNCE_MS = 10000;
+  const DEBOUNCE_MS = 5 * 60 * 1000; // 5 min en modo real
   let pending = [];
   let debounceTimer = null;
+  let countdownTimer = null;
 
   function send(){
     const text = input.value.trim();
@@ -101,19 +103,35 @@ export const CHAT_SIM_HTML = /* html */ `<!doctype html>
     addBubble(text, 'out');
     pending.push(text);
     clearTimeout(debounceTimer);
-    // En modo real: esperar ~10s por si mandás otro mensaje. En modo rápido: al toque.
-    // El debounce va SIEMPRE (así podés mandar la consulta en varios mensajes);
-    // "tiempos reales" solo cambia cuánto espera y las pausas de tipeo.
-    debounceTimer = setTimeout(fireTurn, rtBox.checked ? DEBOUNCE_MS : 3000);
-    typing.style.display = rtBox.checked ? 'none' : 'block';
+    clearInterval(countdownTimer);
+    // El debounce va SIEMPRE (así podés mandar la consulta en varios mensajes).
+    // En modo real espera 5 min tras tu último mensaje; en modo rápido, 3s.
+    const dwell = rtBox.checked ? DEBOUNCE_MS : 3000;
+    debounceTimer = setTimeout(fireTurn, dwell);
+    if(rtBox.checked){
+      let restante = Math.round(dwell / 1000);
+      typing.style.display = 'block';
+      typing.textContent = 'va a responder en ~5 min (modo real)…';
+      countdownTimer = setInterval(() => {
+        restante -= 1;
+        const m = Math.floor(restante/60), s = restante%60;
+        typing.textContent = 'va a responder en ' + m + ':' + String(s).padStart(2,'0') + ' …';
+        if(restante <= 0){ clearInterval(countdownTimer); typing.textContent = 'escribiendo…'; }
+      }, 1000);
+    } else {
+      typing.style.display = 'block';
+      typing.textContent = 'escribiendo…';
+    }
   }
 
   async function fireTurn(){
+    clearInterval(countdownTimer);
     if(pending.length === 0) return;
     const text = pending.join('\\n');
     pending = [];
     sendBtn.disabled = true;
     typing.style.display = 'block';
+    typing.textContent = 'escribiendo…';
     try{
       const r = await fetch('/message', {
         method:'POST',
@@ -142,13 +160,14 @@ export const CHAT_SIM_HTML = /* html */ `<!doctype html>
       // La espera larga (debounce ~10s) ya pasó — sólo una pausa natural corta
       await wait(rt ? 1200 + Math.random()*1300 : 150);
 
-      // cada fragmento tras su tiempo de tipeo (∝ largo)
+      // cada fragmento tras su tiempo de tipeo (~2s por renglón)
       for(let i = 0; i < parts.length; i++){
         const td = rt ? typingDelay(parts[i]) : 250;
-        if(i > 0 || parts.length === 1) { typing.style.display = 'block'; await wait(i === 0 ? td * 0.5 : td); }
+        typing.style.display = 'block';
+        typing.textContent = 'escribiendo…';
+        await wait(td);
         typing.style.display = 'none';
         addBubble(parts[i], 'in');
-        if(i < parts.length - 1) typing.style.display = 'block';
       }
       typing.style.display = 'none';
       addDebug(j.data.agentResponse);
